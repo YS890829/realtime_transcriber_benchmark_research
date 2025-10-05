@@ -4,10 +4,11 @@ iPhoneのボイスメモを文字起こし＆要約するシンプルなスク�
 
 ## 特徴
 
-- **シンプル**: 単一スクリプト（215行）
+- **シンプル**: 単一スクリプト（310行）
 - **高速**: faster-whisper（Intel CPUでwhisper.cppより5倍高速）
 - **無料**: Gemini API無料枠（1日60リクエスト）
 - **ローカル優先**: 音声処理はローカル、要約のみAPI
+- **構造化データ**: Unstructured.ioスタイルのJSON出力
 
 ## 必要環境
 
@@ -72,9 +73,9 @@ python transcribe.py
 ### 処理フロー
 
 1. **新規ファイル検出**: `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`から新規.m4aファイルを検出
-2. **文字起こし**: faster-whisper（mediumモデル）で文字起こし
+2. **文字起こし**: faster-whisper（mediumモデル）で文字起こし＋Unstructured風メタデータ付与
 3. **要約生成**: Gemini APIで要約生成
-4. **保存**: `~/Documents/VoiceMemoTranscripts/`にTXT + Markdown保存
+4. **保存**: `~/Documents/VoiceMemoTranscripts/`にTXT + Markdown + JSON保存
 5. **記録**: `.processed_files.txt`に処理済みファイル名を記録
 
 ### 出力ファイル
@@ -82,7 +83,59 @@ python transcribe.py
 ```
 ~/Documents/VoiceMemoTranscripts/
 ├── meeting_20251005.txt              # 文字起こし全文
-└── meeting_20251005_summary.md       # 要約（Markdown）
+├── meeting_20251005_summary.md       # 要約（Markdown）
+└── meeting_20251005_structured.json  # Unstructured風構造化データ（NEW）
+```
+
+#### JSON出力例（Unstructured.ioスタイル）
+
+```json
+{
+  "elements": [
+    {
+      "element_id": "a3b2c1d4...",
+      "text": "会議を開始します",
+      "type": "TranscriptSegment",
+      "metadata": {
+        "filename": "meeting.m4a",
+        "segment_number": 1,
+        "timestamp": {
+          "start": 0.0,
+          "end": 2.5,
+          "duration": 2.5
+        },
+        "transcription": {
+          "avg_logprob": -0.234,
+          "no_speech_prob": 0.001,
+          "model": "faster-whisper-medium",
+          "vad_applied": true
+        }
+      }
+    },
+    {
+      "element_id": "e5f6g7h8...",
+      "text": "【要約内容】",
+      "type": "Summary",
+      "metadata": {
+        "filename": "meeting.m4a",
+        "generated_by": "gemini-1.5-flash",
+        "generated_at": "2025-10-05T16:45:00"
+      }
+    }
+  ],
+  "metadata": {
+    "filename": "meeting.m4a",
+    "audio_info": {
+      "language": "ja",
+      "duration": 1800.0,
+      "total_segments": 145
+    },
+    "element_types": {
+      "TranscriptSegment": 145,
+      "Summary": 1
+    }
+  }
+}
 ```
 
 ## パフォーマンス
@@ -128,7 +181,7 @@ cat .env
 
 ```
 .
-├── transcribe.py          # メインスクリプト（215行）
+├── transcribe.py          # メインスクリプト（310行）
 ├── requirements.txt       # 依存関係（3つ）
 ├── .env.example          # 環境変数テンプレート
 ├── .gitignore            # Git除外設定
@@ -141,6 +194,23 @@ cat .env
     ├── progress.md
     └── productContext.md
 ```
+
+## Unstructured.ioベンチマーク
+
+このプロジェクトは[Unstructured.io](https://unstructured.io/)のメタデータ構造をベンチマークとして、音声文字起こし向けに最適化しています。
+
+### 採用した設計
+
+- **element_id**: SHA-256ハッシュ（テキスト+タイムスタンプ+ファイル名）
+- **type**: `TranscriptSegment`, `Summary`
+- **metadata構造**: タイムスタンプ、信頼度スコア、モデル情報
+- **JSON出力**: Unstructured互換フォーマット
+
+### 拡張可能性
+
+- `Speaker`: 話者識別（将来拡張）
+- `Topic`: トピック分類（将来拡張）
+- `Sentiment`: 感情分析（将来拡張）
 
 ## 技術スタック
 
