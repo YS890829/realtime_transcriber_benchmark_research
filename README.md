@@ -1,0 +1,185 @@
+# Voice Memo Transcription & Summarization Tool (MVP)
+
+iPhoneのボイスメモを文字起こし＆要約するシンプルなスクリプト
+
+## 特徴
+
+- **シンプル**: 単一スクリプト（215行）
+- **高速**: faster-whisper（Intel CPUでwhisper.cppより5倍高速）
+- **無料**: Gemini API無料枠（1日60リクエスト）
+- **ローカル優先**: 音声処理はローカル、要約のみAPI
+
+## 必要環境
+
+- macOS 14 (Sonoma) 以降
+- Python 3.10+
+- Intel Mac または Apple Silicon Mac
+- RAM 8GB以上
+- ストレージ 3.5GB以上（モデルファイル含む）
+
+## セットアップ
+
+### 1. リポジトリクローン
+
+```bash
+cd ~/Desktop
+git clone <repo-url>
+cd realtime_transcriber_benchmark_research
+```
+
+### 2. Python仮想環境作成
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. 依存関係インストール
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. FFmpegインストール
+
+```bash
+brew install ffmpeg
+```
+
+### 5. Gemini APIキー設定
+
+1. [Google AI Studio](https://aistudio.google.com/)でAPIキーを取得
+2. `.env`ファイルを作成
+
+```bash
+cp .env.example .env
+# .envファイルを編集してAPIキーを設定
+```
+
+`.env`の内容:
+```
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+## 使い方
+
+### 基本的な使い方
+
+```bash
+python transcribe.py
+```
+
+### 処理フロー
+
+1. **新規ファイル検出**: `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`から新規.m4aファイルを検出
+2. **文字起こし**: faster-whisper（mediumモデル）で文字起こし
+3. **要約生成**: Gemini APIで要約生成
+4. **保存**: `~/Documents/VoiceMemoTranscripts/`にTXT + Markdown保存
+5. **記録**: `.processed_files.txt`に処理済みファイル名を記録
+
+### 出力ファイル
+
+```
+~/Documents/VoiceMemoTranscripts/
+├── meeting_20251005.txt              # 文字起こし全文
+└── meeting_20251005_summary.md       # 要約（Markdown）
+```
+
+## パフォーマンス
+
+| 音声長 | 処理時間（目安） |
+|--------|-----------------|
+| 10分   | ~40秒          |
+| 30分   | ~2分           |
+| 60分   | ~4分           |
+
+※ Intel MacBook Pro、mediumモデル使用時
+
+## トラブルシューティング
+
+### ボイスメモフォルダが見つからない
+
+```bash
+# macOSバージョン確認
+sw_vers
+
+# パス確認
+ls ~/Library/Group\ Containers/group.com.apple.VoiceMemos.shared/Recordings/
+```
+
+macOS Sonoma以降であることを確認してください。
+
+### Gemini APIエラー
+
+```bash
+# APIキー確認
+cat .env
+```
+
+- APIキーが正しいか確認
+- 1日60リクエスト制限を超えていないか確認
+
+### メモリ不足
+
+- mediumモデルは約3GB RAM使用
+- 他のアプリを終了してメモリを確保
+
+## ファイル構成
+
+```
+.
+├── transcribe.py          # メインスクリプト（215行）
+├── requirements.txt       # 依存関係（3つ）
+├── .env.example          # 環境変数テンプレート
+├── .gitignore            # Git除外設定
+├── README.md             # このファイル
+└── memory-bank/          # 開発メモリーバンク
+    ├── projectbrief.md
+    ├── systemPatterns.md
+    ├── techContext.md
+    ├── activeContext.md
+    ├── progress.md
+    └── productContext.md
+```
+
+## 技術スタック
+
+- **faster-whisper**: ローカル文字起こし（CTranslate2）
+- **Google Gemini API**: 要約生成（gemini-1.5-flash）
+- **Python 3.10+**: シンプルな関数ベース実装
+
+## ライセンス
+
+MIT License
+
+## 開発者向け
+
+### メモリーバンク
+
+`memory-bank/`ディレクトリに開発計画と技術仕様を記録しています。
+
+- `projectbrief.md`: プロジェクト概要とMVP範囲
+- `systemPatterns.md`: アーキテクチャと実装パターン
+- `techContext.md`: 技術スタック詳細
+- `activeContext.md`: 現在の作業状態
+- `progress.md`: 進捗管理
+- `productContext.md`: ユーザー要件
+
+### コントリビューション
+
+1. Fork
+2. Feature branch作成
+3. Commit
+4. Push
+5. Pull Request
+
+## 今後の拡張候補
+
+MVPで不便を感じた場合のみ追加:
+
+- [ ] watchdog自動監視
+- [ ] モデルサイズ選択（medium/large）
+- [ ] バッチ処理最適化
+- [ ] Web UI
+- [ ] Whisper API fallback
+- [ ] Claude API対応
