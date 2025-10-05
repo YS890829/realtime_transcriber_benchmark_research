@@ -6,9 +6,12 @@ iPhoneのボイスメモを文字起こし＆要約するシンプルなスク�
 """
 
 import os
+import json
+import hashlib
 import logging
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
+from datetime import datetime
 
 from faster_whisper import WhisperModel
 import google.generativeai as genai
@@ -60,15 +63,15 @@ def find_new_files() -> List[Path]:
     return new_files
 
 
-def transcribe_audio(audio_path: Path) -> str:
+def transcribe_audio(audio_path: Path) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
     """
-    faster-whisperで音声をテキスト化
+    faster-whisperで音声をテキスト化（Unstructured風メタデータ付き）
 
     Args:
         audio_path: 音声ファイルのパス
 
     Returns:
-        str: 文字起こしテキスト
+        Tuple[str, List[Dict], Dict]: (全文テキスト, セグメントリスト, 音声情報)
     """
     logger.info(f"文字起こし中: {audio_path.name}")
 
@@ -82,11 +85,56 @@ def transcribe_audio(audio_path: Path) -> str:
         vad_filter=True  # 無音除去
     )
 
-    # セグメントを結合
-    transcript = " ".join([seg.text for seg in segments])
+    # Unstructured風メタデータ構造でセグメント保存
+    structured_segments = []
+    full_text_parts = []
 
-    logger.info(f"文字起こし完了: {len(transcript)}文字")
-    return transcript
+    for idx, seg in enumerate(segments):
+        # セグメントテキスト
+        segment_text = seg.text.strip()
+        full_text_parts.append(segment_text)
+
+        # element_id生成（Unstructured風: SHA-256ハッシュ）
+        element_id = hashlib.sha256(
+            f"{segment_text}_{seg.start}_{seg.end}_{audio_path.name}".encode()
+        ).hexdigest()
+
+        # Unstructured風セグメント構造
+        structured_segment = {
+            "element_id": element_id,
+            "text": segment_text,
+            "type": "TranscriptSegment",
+            "metadata": {
+                "filename": audio_path.name,
+                "segment_number": idx + 1,
+                "timestamp": {
+                    "start": round(seg.start, 2),
+                    "end": round(seg.end, 2),
+                    "duration": round(seg.end - seg.start, 2)
+                },
+                "transcription": {
+                    "avg_logprob": round(seg.avg_logprob, 4) if hasattr(seg, 'avg_logprob') else None,
+                    "no_speech_prob": round(seg.no_speech_prob, 4) if hasattr(seg, 'no_speech_prob') else None,
+                    "model": "faster-whisper-medium",
+                    "vad_applied": True
+                }
+            }
+        }
+        structured_segments.append(structured_segment)
+
+    # 全文結合
+    full_transcript = " ".join(full_text_parts)
+
+    # 音声全体の情報
+    audio_info = {
+        "language": info.language,
+        "language_probability": round(info.language_probability, 4),
+        "duration": round(info.duration, 2),
+        "total_segments": len(structured_segments)
+    }
+
+    logger.info(f"文字起こし完了: {len(full_transcript)}文字, {len(structured_segments)}セグメント")
+    return full_transcript, structured_segments, audio_info
 
 
 def summarize_text(transcript: str) -> str:
@@ -129,17 +177,25 @@ def summarize_text(transcript: str) -> str:
     return summary
 
 
-def save_output(filename: str, transcript: str, summary: str) -> Tuple[Path, Path]:
+def save_output(
+    filename: str,
+    transcript: str,
+    summary: str,
+    segments: List[Dict[str, Any]],
+    audio_info: Dict[str, Any]
+) -> Tuple[Path, Path, Path]:
     """
-    TXTとMarkdownで結果を保存
+    TXT、Markdown、JSONで結果を保存（Unstructured風）
 
     Args:
         filename: 元ファイル名
         transcript: 文字起こしテキスト
         summary: 要約テキスト
+        segments: Unstructured風セグメントリスト
+        audio_info: 音声情報
 
     Returns:
-        Tuple[Path, Path]: (txtパス, mdパス)
+        Tuple[Path, Path, Path]: (txtパス, mdパス, jsonパス)
     """
     logger.info("ファイル保存中...")
 
@@ -160,7 +216,41 @@ def save_output(filename: str, transcript: str, summary: str) -> Tuple[Path, Pat
     md_path.write_text(md_content, encoding="utf-8")
     logger.info(f"保存: {md_path}")
 
-    return txt_path, md_path
+    # JSON: Unstructured風構造化データ
+    json_path = OUTPUT_DIR / f"{base_name}_structured.json"
+
+    # 要約もUnstructured風エレメントとして追加
+    summary_element = {
+        "element_id": hashlib.sha256(f"{summary}_{filename}".encode()).hexdigest(),
+        "text": summary,
+        "type": "Summary",
+        "metadata": {
+            "filename": filename,
+            "generated_by": "gemini-1.5-flash",
+            "generated_at": datetime.now().isoformat()
+        }
+    }
+
+    # 完全なUnstructured風JSON構造
+    structured_data = {
+        "elements": segments + [summary_element],
+        "metadata": {
+            "filename": filename,
+            "file_directory": str(VOICE_MEMOS_PATH),
+            "audio_info": audio_info,
+            "processed_at": datetime.now().isoformat(),
+            "total_elements": len(segments) + 1,
+            "element_types": {
+                "TranscriptSegment": len(segments),
+                "Summary": 1
+            }
+        }
+    }
+
+    json_path.write_text(json.dumps(structured_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    logger.info(f"保存: {json_path}")
+
+    return txt_path, md_path, json_path
 
 
 def mark_as_processed(filename: str) -> None:
@@ -190,19 +280,22 @@ def main():
         try:
             logger.info(f"\n処理開始: {audio_file.name}")
 
-            # 文字起こし
-            transcript = transcribe_audio(audio_file)
+            # 文字起こし（Unstructured風メタデータ付き）
+            transcript, segments, audio_info = transcribe_audio(audio_file)
 
             # 要約生成
             summary = summarize_text(transcript)
 
-            # 保存
-            save_output(audio_file.name, transcript, summary)
+            # 保存（TXT + Markdown + JSON）
+            save_output(audio_file.name, transcript, summary, segments, audio_info)
 
             # 処理済みリストに追加
             mark_as_processed(audio_file.name)
 
-            logger.info(f"✅ 処理完了: {audio_file.name}\n")
+            logger.info(f"✅ 処理完了: {audio_file.name}")
+            logger.info(f"   - セグメント数: {len(segments)}")
+            logger.info(f"   - 音声長: {audio_info['duration']}秒")
+            logger.info(f"   - 言語: {audio_info['language']}\n")
 
         except Exception as e:
             logger.error(f"❌ 処理失敗: {audio_file.name} - {e}\n")
