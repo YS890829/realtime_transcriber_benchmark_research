@@ -6,7 +6,7 @@
 - **Python**: 3.10以上
 - **パッケージ管理**: pip + requirements.txt
 
-### MVP必須ライブラリ（3つのみ）
+### MVP必須ライブラリ（Phase 1: 3つ）
 ```python
 # faster-whisper - ローカル文字起こし
 faster-whisper==1.0.0
@@ -17,6 +17,18 @@ google-generativeai==0.4.0
 # python-dotenv - 環境変数管理
 python-dotenv==1.0.0
 ```
+
+### Phase 2追加ライブラリ（話者分離）
+```python
+# pyannote.audio - 話者分離
+pyannote.audio==3.1.1
+```
+
+**Phase 2で追加した依存関係**: pyannote.audio（話者分離）
+- HuggingFaceトークン必要（無料）
+- モデル: pyannote/speaker-diarization-3.1
+- CPU対応（Intel Mac可）
+- ライセンス: MIT
 
 ### MVPで削除したライブラリ
 ```python
@@ -56,12 +68,18 @@ brew install ffmpeg
 - **Full Disk Access**: `~/Library/Group Containers/` へのアクセス
 - **通知**: 処理完了通知の送信
 
-### API要件（MVPではGeminiのみ）
+### API要件
 
-#### Google Gemini API
+#### Google Gemini API（Phase 1）
 - **APIキー**: [Google AI Studio](https://aistudio.google.com/)から取得
 - **料金**: 無料（1日60リクエスト）
 - **制限**: トークン数上限あり（MVP範囲では十分）
+
+#### HuggingFace API（Phase 2）
+- **トークン**: [HuggingFace Settings](https://huggingface.co/settings/tokens)から取得
+- **モデル利用規約**: [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization)に同意必須
+- **料金**: 無料（推論は無制限）
+- **制限**: モデルダウンロードにトークン必要
 
 **MVPで削除**:
 - ❌ OpenAI Whisper API（faster-whisperのみ）
@@ -88,9 +106,8 @@ brew install ffmpeg
 ### APIキー管理
 ```python
 # .env ファイル（Gitには含めない）
-OPENAI_API_KEY=sk-...
 GEMINI_API_KEY=AI...
-ANTHROPIC_API_KEY=sk-ant-...
+HF_TOKEN=hf_...
 ```
 
 ### ファイルアクセス権限
@@ -132,13 +149,29 @@ ANTHROPIC_API_KEY=sk-ant-...
 ## 開発ワークフロー
 
 ### MVPプロジェクト構造（最小構成）
+
+**Phase 1（mainブランチ）**:
 ```
 voice-memo-transcriber/
 ├── .env                    # GEMINI_API_KEY
 ├── .gitignore
 ├── requirements.txt        # 3つのパッケージ
-├── transcribe.py           # メインスクリプト（200-300行）
+├── transcribe.py           # メインスクリプト（215行）
 └── .processed_files.txt    # 処理済みリスト
+```
+
+**Phase 2（feature/unstructured-metadataブランチ）**:
+```
+voice-memo-transcriber/
+├── .env                    # GEMINI_API_KEY, HF_TOKEN
+├── .gitignore
+├── requirements.txt        # 4つのパッケージ（+pyannote.audio）
+├── transcribe.py           # メインスクリプト（395行）
+├── .processed_files.txt    # 処理済みリスト
+└── outputs/
+    ├── {filename}.txt           # 文字起こし全文
+    ├── {filename}_summary.md    # 要約（Markdown）
+    └── {filename}_structured.json # Unstructured風メタデータ（Phase 2追加）
 ```
 
 **MVPで削除**:
@@ -148,6 +181,8 @@ voice-memo-transcriber/
 - ❌ utils/（標準ライブラリで十分）
 
 ### MVP環境セットアップ（シンプル化）
+
+**Phase 1（mainブランチ）**:
 ```bash
 # 1. Python仮想環境作成
 python3 -m venv venv
@@ -163,6 +198,31 @@ brew install ffmpeg
 echo "GEMINI_API_KEY=your_key_here" > .env
 
 # 5. 実行（初回はモデル自動ダウンロード）
+python transcribe.py
+```
+
+**Phase 2（feature/unstructured-metadataブランチ）**:
+```bash
+# 1. ブランチ切り替え
+git checkout feature/unstructured-metadata
+
+# 2. Python仮想環境作成
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. 依存関係インストール（4つ: +pyannote.audio）
+pip install -r requirements.txt
+
+# 4. FFmpegインストール
+brew install ffmpeg
+
+# 5. 環境変数設定（2つのAPI）
+cat > .env << EOF
+GEMINI_API_KEY=your_gemini_key_here
+HF_TOKEN=your_huggingface_token_here
+EOF
+
+# 6. 実行（初回はモデル自動ダウンロード: Whisper + pyannote）
 python transcribe.py
 ```
 

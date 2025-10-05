@@ -2,14 +2,18 @@
 
 ## 現在のフォーカス
 
-**Phase**: MVP実装完了
+**Phase**: Phase 2実装完了（Unstructured風メタデータ＆話者分離）
 **Status**: 実装100%完了、テスト待ち
+**Branch**: feature/unstructured-metadata
 
 ### 現在の作業
-- ✅ MVP実装完了（transcribe.py 215行）
-- ✅ 全ファイル作成完了
-- ✅ Git 4コミット完了
-- ⏳ ユーザーによる動作テスト待ち
+- ✅ Phase 1（MVP）実装完了（mainブランチ、transcribe.py 215行）
+- ✅ Phase 2実装完了（feature/unstructured-metadataブランチ、transcribe.py 395行）
+- ✅ Unstructured.io風メタデータ追加
+- ✅ 話者分離追加（pyannote.audio）
+- ✅ JSON出力機能追加
+- ✅ Git 3コミット完了（feature/unstructured-metadataブランチ）
+- ⏳ ユーザーによる動作テスト待ち（テスト後にmainブランチへマージ）
 
 ## 最近の変更
 
@@ -66,40 +70,82 @@
   - ファイル数: 15 → 3（80%削減）
   - 依存関係: 9 → 3（67%削減）
 
+### 2025-10-05（Phase 2: Unstructured風メタデータ＆話者分離実装）
+- **リサーチ完了**:
+  - Unstructured.io調査（オープンソース版分析）
+  - 音声文字起こし向けメタデータ構造設計
+  - pyannote.audio調査（話者分離）
+
+- **実装完了**（feature/unstructured-metadataブランチ）:
+  - transcribe.py拡張（215行 → 395行、+180行）
+  - diarize_audio() 関数実装（pyannote.audio）
+  - get_speaker_for_segment() 関数実装
+  - JSON出力機能追加（_structured.json）
+  - element_id生成（SHA-256ハッシュ）
+  - speaker_id追加（SPEAKER_00等）
+  - 言語を日本語固定
+  - requirements.txt更新（4依存関係、pyannote.audio追加）
+  - .env.example更新（HF_TOKEN追加）
+  - README.md更新（JSON出力例、Unstructuredベンチマーク追加）
+
+- **Git管理**:
+  - feature/unstructured-metadataブランチ作成
+  - 3コミット完了
+  - テスト後にmainブランチへマージ予定
+
 ## 次のステップ（テスト）
 
-### 完了済み
+### Phase 1（mainブランチ）完了済み
 1. ✅ メモリーバンク更新完了
 2. ✅ transcribe.py実装（215行）
 3. ✅ requirements.txt作成
 4. ✅ .env.example作成
 5. ✅ .gitignore作成
 6. ✅ README.md作成
-7. ✅ Git 4コミット完了
+7. ✅ Git 5コミット完了
 
-### ユーザーが実行すべきテスト
-1. **環境セットアップ**:
+### Phase 2（feature/unstructured-metadataブランチ）完了済み
+1. ✅ Unstructured.ioリサーチ完了
+2. ✅ transcribe.py拡張（395行）
+3. ✅ diarize_audio() 実装
+4. ✅ get_speaker_for_segment() 実装
+5. ✅ JSON出力機能追加
+6. ✅ requirements.txt更新（pyannote.audio追加）
+7. ✅ .env.example更新（HF_TOKEN追加）
+8. ✅ README.md更新
+9. ✅ Git 3コミット完了
+10. ✅ メモリーバンク更新完了
+
+### ユーザーが実行すべきテスト（feature/unstructured-metadataブランチ）
+1. **ブランチ切り替え**:
+   ```bash
+   git checkout feature/unstructured-metadata
+   ```
+
+2. **環境セットアップ**:
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
    brew install ffmpeg
    cp .env.example .env
-   # .envにGEMINI_API_KEYを設定
+   # .envにGEMINI_API_KEYとHF_TOKENを設定
    ```
 
-2. **動作確認**:
+3. **動作確認**:
    ```bash
    python transcribe.py
    ```
 
-3. **確認項目**:
+4. **確認項目**:
    - ボイスメモフォルダ検出
    - 新規ファイル検出
+   - 話者分離（pyannote.audio）
    - faster-whisper文字起こし（初回はモデルダウンロード）
    - Gemini API要約
-   - ファイル保存（TXT + Markdown）
+   - ファイル保存（TXT + Markdown + JSON）
    - .processed_files.txt更新
+   - JSON出力（element_id、speaker_id確認）
 
 ## MVP決定事項
 

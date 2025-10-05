@@ -35,6 +35,24 @@
 **完了日**: 2025-10-05
 **実績**: 実装100%完了、テスト待ち
 
+### ✅ Phase 2: Unstructured風メタデータ＆話者分離（完了）
+**目標**: データ構造化と話者識別の追加
+
+#### タスク
+- [x] Unstructured.ioリサーチ
+- [x] メタデータ構造設計
+- [x] JSON出力機能実装
+- [x] element_id生成（SHA-256）
+- [x] タイムスタンプメタデータ
+- [x] 話者分離リサーチ（pyannote.audio）
+- [x] pyannote.audio統合
+- [x] speaker_id追加
+- [x] 言語を日本語固定
+- [x] HuggingFaceトークン対応
+
+**完了日**: 2025-10-05
+**実績**: feature/unstructured-metadataブランチで実装完了、テスト待ち
+
 ## 完了タスク
 
 ### 2025-10-05（初期リサーチ）
@@ -75,6 +93,31 @@
 - ✅ README.md作成（185行）
 - ✅ Git初期化・4コミット完了
 
+### 2025-10-05（Unstructured風メタデータ＆話者分離実装）
+- ✅ Unstructured.ioリサーチ（オープンソース版分析）
+- ✅ メタデータ構造設計（音声文字起こし向け）
+- ✅ transcribe.py拡張（215行 → 395行、+85行）
+  - ✅ diarize_audio() 関数実装（話者分離）
+  - ✅ get_speaker_for_segment() 関数実装
+  - ✅ JSON出力機能追加（_structured.json）
+  - ✅ element_id生成（SHA-256ハッシュ）
+  - ✅ speaker_id追加（SPEAKER_00等）
+  - ✅ 言語を日本語固定
+- ✅ requirements.txt更新（4依存関係、pyannote.audio追加）
+- ✅ .env.example更新（HF_TOKEN追加）
+- ✅ README.md更新（JSON出力例、Unstructuredベンチマーク追加）
+- ✅ feature/unstructured-metadataブランチ・3コミット完了
+
+## Phase 2で追加した機能
+
+### ✅ 実装済み
+- ✅ **JSON出力**（_structured.json）← MVP範囲外だったが追加
+- ✅ **Unstructured風メタデータ構造**
+- ✅ **話者分離**（pyannote.audio）
+- ✅ **element_id**（SHA-256ハッシュ）
+- ✅ **speaker_id**（SPEAKER_00, SPEAKER_01等）
+- ✅ **日本語固定**（言語検出除外）
+
 ## MVPで削除した機能
 
 ### 実装から除外
@@ -84,7 +127,6 @@
 - ❌ Strategy Pattern（単純な関数）
 - ❌ リトライロジック（エラーログのみ）
 - ❌ バッチ処理最適化（単純なループ）
-- ❌ JSON出力（TXT + Markdownのみ）
 - ❌ SQLite/DB（.processed_files.txtのみ）
 - ❌ macOS通知（ログ出力のみ）
 - ❌ ログファイル（標準出力のみ）
@@ -99,24 +141,27 @@
 ## メトリクス
 
 ### 開発進捗
-- **全体進捗**: 95% (実装完了、テスト待ち)
+- **全体進捗**: 98% (Phase 2実装完了、テスト待ち)
 - **Phase 0（計画）**: 100% ✅
 - **Phase 1（MVP実装）**: 100% ✅
+- **Phase 2（メタデータ＆話者分離）**: 100% ✅
 
-### コード統計（MVP実績）
-- **実装総行数**: 215行（transcribe.py）
+### コード統計（Phase 2実績）
+- **実装総行数**: 395行（transcribe.py）← 215行から+85行
 - **ファイル数**: 7ファイル
-  - transcribe.py (215行)
-  - requirements.txt (3行)
-  - .env.example (3行)
+  - transcribe.py (395行) ← 215行から拡張
+  - requirements.txt (4行) ← pyannote.audio追加
+  - .env.example (9行) ← HF_TOKEN追加
   - .gitignore (22行)
-  - README.md (185行)
-  - memory-bank/ (6ファイル、1088行)
-- **Git コミット**: 4コミット
-- **削減率**:
-  - コード量: 2000行 → 215行（89%削減）
-  - ファイル数: 15 → 3（80%削減）
-  - 依存関係: 9 → 3（67%削減）
+  - README.md (270行) ← JSON出力例追加
+  - memory-bank/ (6ファイル、更新中)
+- **Git コミット**:
+  - mainブランチ: 5コミット
+  - feature/unstructured-metadata: +3コミット
+- **機能拡張**:
+  - JSON出力追加（Unstructured風）
+  - 話者分離追加（pyannote.audio）
+  - メタデータ大幅拡充
 
 ### MVPパフォーマンス目標
 | 指標 | 目標値 | 現状 |
@@ -167,3 +212,4 @@
 - **2025-10-05 09:00**: 初版作成、Phase 0完了記録
 - **2025-10-05 14:00**: MVP版に更新、不要な複雑さを削除
 - **2025-10-05 16:40**: MVP実装完了、進捗100%に更新
+- **2025-10-05 18:00**: Phase 2実装完了（Unstructured風メタデータ＆話者分離）
