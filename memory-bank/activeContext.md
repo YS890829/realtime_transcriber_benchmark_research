@@ -2,13 +2,14 @@
 
 ## 現在のフォーカス
 
-**Phase**: MVP計画フェーズ
-**Status**: MVP範囲確定、メモリーバンク更新完了
+**Phase**: MVP実装完了
+**Status**: 実装100%完了、テスト待ち
 
 ### 現在の作業
-- MVP最小構成への実装プラン変更完了
-- メモリーバンク更新完了
-- 実装準備完了（transcribe.py作成待ち）
+- ✅ MVP実装完了（transcribe.py 215行）
+- ✅ 全ファイル作成完了
+- ✅ Git 4コミット完了
+- ⏳ ユーザーによる動作テスト待ち
 
 ## 最近の変更
 
@@ -46,32 +47,59 @@
   - 4つのシンプルな関数（find_new_files, transcribe_audio, summarize_text, save_output）
   - デザインパターン削除（Strategy Pattern等）
 
-## 次のステップ（MVP）
+### 2025-10-05（MVP実装完了）
+- **実装完了**:
+  - transcribe.py（215行）- 全関数実装完了
+  - requirements.txt（3依存関係）
+  - .env.example（Gemini APIキー）
+  - .gitignore（適切な除外設定）
+  - README.md（185行、完全ドキュメント）
+  - memory-bank/（6ファイル、1088行）
 
-### 即座に必要なアクション
+- **Git管理**:
+  - リポジトリ初期化
+  - 4コミット完了
+  - 全ファイル追跡完了
+
+- **削減実績**:
+  - コード量: 2000行 → 215行（89%削減）
+  - ファイル数: 15 → 3（80%削減）
+  - 依存関係: 9 → 3（67%削減）
+
+## 次のステップ（テスト）
+
+### 完了済み
 1. ✅ メモリーバンク更新完了
-2. ⬜ transcribe.py実装（200-300行）
-3. ⬜ requirements.txt作成
-4. ⬜ .env.example作成
-5. ⬜ 動作テスト
+2. ✅ transcribe.py実装（215行）
+3. ✅ requirements.txt作成
+4. ✅ .env.example作成
+5. ✅ .gitignore作成
+6. ✅ README.md作成
+7. ✅ Git 4コミット完了
 
-### MVP実装タスク（シンプル化）
-1. **transcribe.py作成**:
-   - find_new_files() 関数
-   - transcribe_audio() 関数
-   - summarize_text() 関数
-   - save_output() 関数
-   - main() 関数
+### ユーザーが実行すべきテスト
+1. **環境セットアップ**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   brew install ffmpeg
+   cp .env.example .env
+   # .envにGEMINI_API_KEYを設定
+   ```
 
-2. **依存関係**:
-   - requirements.txt（3つのみ）
-   - .env.example（GEMINI_API_KEY）
+2. **動作確認**:
+   ```bash
+   python transcribe.py
+   ```
 
-3. **動作確認**:
-   - 新規ファイル検出テスト
-   - 文字起こしテスト
-   - 要約テスト
-   - 保存テスト
+3. **確認項目**:
+   - ボイスメモフォルダ検出
+   - 新規ファイル検出
+   - faster-whisper文字起こし（初回はモデルダウンロード）
+   - Gemini API要約
+   - ファイル保存（TXT + Markdown）
+   - .processed_files.txt更新
 
 ## MVP決定事項
 
