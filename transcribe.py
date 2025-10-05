@@ -16,6 +16,7 @@ from datetime import datetime
 from faster_whisper import WhisperModel
 import google.generativeai as genai
 from dotenv import load_dotenv
+from pyannote.audio import Pipeline
 
 # ロギング設定
 logging.basicConfig(
@@ -63,25 +64,102 @@ def find_new_files() -> List[Path]:
     return new_files
 
 
-def transcribe_audio(audio_path: Path) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+def diarize_audio(audio_path: Path) -> Dict[str, Any]:
     """
-    faster-whisperで音声をテキスト化（Unstructured風メタデータ付き）
+    pyannote.audioで話者分離
 
     Args:
         audio_path: 音声ファイルのパス
+
+    Returns:
+        Dict: 話者分離結果（タイムスタンプ -> 話者ID）
+    """
+    logger.info(f"話者分離中: {audio_path.name}")
+
+    # HuggingFace トークン取得
+    hf_token = os.getenv("HF_TOKEN")
+    if not hf_token:
+        logger.warning("HF_TOKENが設定されていません。話者分離をスキップします")
+        return {}
+
+    try:
+        # pyannote.audio パイプライン初期化
+        pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.1",
+            use_auth_token=hf_token
+        )
+
+        # 話者分離実行
+        diarization = pipeline(str(audio_path))
+
+        # タイムスタンプ -> 話者ID のマッピング作成
+        speaker_segments = {}
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
+            speaker_segments[f"{turn.start:.2f}-{turn.end:.2f}"] = {
+                "speaker": speaker,
+                "start": round(turn.start, 2),
+                "end": round(turn.end, 2)
+            }
+
+        logger.info(f"話者分離完了: {len(set([s['speaker'] for s in speaker_segments.values()]))}人検出")
+        return speaker_segments
+
+    except Exception as e:
+        logger.warning(f"話者分離エラー: {e}. 話者情報なしで続行します")
+        return {}
+
+
+def get_speaker_for_segment(seg_start: float, seg_end: float, speaker_segments: Dict) -> str:
+    """
+    セグメントのタイムスタンプから話者IDを取得
+
+    Args:
+        seg_start: セグメント開始時刻
+        seg_end: セグメント終了時刻
+        speaker_segments: 話者分離結果
+
+    Returns:
+        str: 話者ID（見つからない場合は"UNKNOWN"）
+    """
+    if not speaker_segments:
+        return "UNKNOWN"
+
+    # セグメントの中間点で話者を判定
+    mid_point = (seg_start + seg_end) / 2
+
+    for speaker_info in speaker_segments.values():
+        if speaker_info["start"] <= mid_point <= speaker_info["end"]:
+            return speaker_info["speaker"]
+
+    return "UNKNOWN"
+
+
+def transcribe_audio(
+    audio_path: Path,
+    speaker_segments: Dict[str, Any] = None
+) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    faster-whisperで音声をテキスト化（Unstructured風メタデータ + 話者ID付き）
+
+    Args:
+        audio_path: 音声ファイルのパス
+        speaker_segments: 話者分離結果（オプション）
 
     Returns:
         Tuple[str, List[Dict], Dict]: (全文テキスト, セグメントリスト, 音声情報)
     """
     logger.info(f"文字起こし中: {audio_path.name}")
 
+    if speaker_segments is None:
+        speaker_segments = {}
+
     # モデル初期化（デフォルト設定、量子化なし）
     model = WhisperModel("medium", device="cpu")
 
-    # 文字起こし実行
+    # 文字起こし実行（日本語固定）
     segments, info = model.transcribe(
         str(audio_path),
-        language="ja",
+        language="ja",  # 日本語のみ対応
         vad_filter=True  # 無音除去
     )
 
@@ -94,12 +172,15 @@ def transcribe_audio(audio_path: Path) -> Tuple[str, List[Dict[str, Any]], Dict[
         segment_text = seg.text.strip()
         full_text_parts.append(segment_text)
 
+        # 話者ID取得
+        speaker_id = get_speaker_for_segment(seg.start, seg.end, speaker_segments)
+
         # element_id生成（Unstructured風: SHA-256ハッシュ）
         element_id = hashlib.sha256(
             f"{segment_text}_{seg.start}_{seg.end}_{audio_path.name}".encode()
         ).hexdigest()
 
-        # Unstructured風セグメント構造
+        # Unstructured風セグメント構造（話者ID付き）
         structured_segment = {
             "element_id": element_id,
             "text": segment_text,
@@ -107,6 +188,7 @@ def transcribe_audio(audio_path: Path) -> Tuple[str, List[Dict[str, Any]], Dict[
             "metadata": {
                 "filename": audio_path.name,
                 "segment_number": idx + 1,
+                "speaker_id": speaker_id,  # 話者ID追加
                 "timestamp": {
                     "start": round(seg.start, 2),
                     "end": round(seg.end, 2),
@@ -280,8 +362,11 @@ def main():
         try:
             logger.info(f"\n処理開始: {audio_file.name}")
 
-            # 文字起こし（Unstructured風メタデータ付き）
-            transcript, segments, audio_info = transcribe_audio(audio_file)
+            # 話者分離
+            speaker_segments = diarize_audio(audio_file)
+
+            # 文字起こし（Unstructured風メタデータ + 話者ID付き）
+            transcript, segments, audio_info = transcribe_audio(audio_file, speaker_segments)
 
             # 要約生成
             summary = summarize_text(transcript)
@@ -292,8 +377,12 @@ def main():
             # 処理済みリストに追加
             mark_as_processed(audio_file.name)
 
+            # 話者数をカウント
+            unique_speakers = len(set([s['metadata']['speaker_id'] for s in segments]))
+
             logger.info(f"✅ 処理完了: {audio_file.name}")
             logger.info(f"   - セグメント数: {len(segments)}")
+            logger.info(f"   - 話者数: {unique_speakers}人")
             logger.info(f"   - 音声長: {audio_info['duration']}秒")
             logger.info(f"   - 言語: {audio_info['language']}\n")
 
