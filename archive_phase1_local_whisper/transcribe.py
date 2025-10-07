@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 # 環境変数読み込み
 load_dotenv()
 
+# HuggingFace トークンを環境変数に設定
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HUGGING_FACE_HUB_TOKEN"] = hf_token
+
 # 定数
 VOICE_MEMOS_PATH = Path.home() / "Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings"
 OUTPUT_DIR = Path.home() / "Documents/VoiceMemoTranscripts"
@@ -237,7 +242,8 @@ def summarize_text(transcript: str) -> str:
         raise ValueError("GEMINI_API_KEYが設定されていません。.envファイルを確認してください")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    # Use gemini-2.0-flash (gemini-1.5-flash is deprecated)
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
     # 要約プロンプト
     prompt = f"""以下の文字起こしテキストを要約してください。

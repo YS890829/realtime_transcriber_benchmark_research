@@ -1,109 +1,125 @@
-# Project Brief: Voice Memo Transcription & Summarization System (MVP)
+# Project Brief: API専用 音声文字起こしシステム（超シンプル版）
 
 ## プロジェクト概要
 
-iPhone 17のボイスメモをIntel MacBook Proで取得し、LLMを使って文字起こしと要約を行う**最小構成MVPシステム**を構築する。
+OpenAI Whisper APIを使った**最小構成の音声文字起こしスクリプト**を構築する。
 
-## MVP目的（最小限の機能）
+## 目的（超シンプル版）
 
-- **シンプルな文字起こし**: faster-whisperで正確な文字起こし
-- **基本的な要約**: Gemini APIで要約生成
-- **手動実行**: スクリプト実行で処理開始（自動監視なし）
-- **最小コスト**: 無料・ローカル処理のみ
+- **動くものを最優先**: 50行のコードで完結
+- **初学者でも理解可能**: 全てのコードが読める
+- **エラー対応が容易**: デバッグが簡単
+- **最小コスト**: Whisper APIのみ（$0.006/分）
 
 ## ターゲットユーザー
 
-- 会議やインタビューを頻繁に録音するビジネスパーソン
-- 講義や研究インタビューを記録する研究者・学生
-- ポッドキャストやコンテンツ制作者
-- 日常的にボイスメモを活用するユーザー
+- 音声ファイルをテキスト化したい全てのユーザー
+- プログラミング初学者でも使える簡単さ
 
-## MVP コアバリュー
+## コアバリュー
 
-1. **シンプルさ**: 1つのPythonスクリプトで完結
-2. **高精度**: faster-whisper mediumで十分な精度
-3. **プライバシー**: ローカル処理（faster-whisper）
-4. **無料**: Gemini APIフリーティア使用
+1. **超シンプル**: 50行のコード、3つの関数のみ
+2. **高精度**: OpenAI Whisper API（最新モデル）
+3. **低コスト**: $0.36/60分音声
+4. **学習容易**: 30分で理解できる
 
-## MVP 成功基準
+## 成功基準
 
-- ✅ 新規ボイスメモファイルを検出できる
+- ✅ 音声ファイルを指定して実行できる
 - ✅ 文字起こしが正常に動作する
-- ✅ 要約が生成される
-- ✅ TXTとMarkdownファイルに保存される
+- ✅ テキストファイルに保存される
+- ✅ コード全体を初学者が理解できる
 
-## MVP実装フェーズ（シンプル化）
+## 実装フェーズ
 
-### Phase 1: 単一スクリプト実装
-**目標**: 1つのPythonファイルで全機能を実装
+### Phase 3: 超シンプル版実装（現在）
+**目標**: 50行で動くものを作る
 
 **実装内容**:
-1. ボイスメモフォルダから新規.m4aファイル検出
-2. faster-whisperで文字起こし
-3. Gemini APIで要約生成
-4. TXT + Markdown保存
-5. 処理済みリストに記録（`.processed_files.txt`）
+1. コマンドライン引数で音声ファイル指定
+2. OpenAI Whisper APIで文字起こし
+3. テキストファイルに保存
 
-**除外した機能**（MVP不要）:
-- ❌ watchdog自動監視（手動実行で十分）
-- ❌ Whisper API fallback（faster-whisperのみ）
-- ❌ Claude API（Gemini APIのみ）
-- ❌ リトライロジック（エラーログのみ）
-- ❌ 複雑なバッチ処理（シンプルなループ）
-- ❌ JSON出力（TXT + Markdownのみ）
-- ❌ Strategy Pattern（単純な関数）
+**除外した機能**（Phase 1-2から削除）:
+- ❌ 自動ファイル検出（手動指定で十分）
+- ❌ 処理済みリスト管理（不要）
+- ❌ 要約生成（文字起こしに集中）
+- ❌ JSON/Markdown出力（TXTのみ）
+- ❌ 話者分離（APIにない機能）
+- ❌ メタデータ（不要）
+- ❌ エラーリトライ（手動再実行で十分）
 
-## MVP 技術スタック（最小構成）
+### Phase 4: 要約機能追加（Phase 3完了後）
+**目標**: Gemini APIで要約生成
+
+**実装内容**:
+- Gemini APIで文字起こし結果を要約
+- Markdown形式で保存
+- +30行程度の追加
+
+**前提条件**: Phase 3が動作すること
+
+### Phase 5: 自動ファイル検出（Phase 4完了後）
+**目標**: iCloud新規音声データの自動検出
+
+**実装内容**:
+- iCloudボイスメモフォルダ監視
+- 新規.m4aファイル検出
+- 処理済みリスト管理
+- +50行程度の追加
+
+**前提条件**: Phase 4が動作すること
+
+## 技術スタック（Phase 3: 超シンプル版）
 
 ### 必須ライブラリのみ
 ```
-faster-whisper==1.0.0        # 文字起こし
-google-generativeai==0.4.0   # 要約
-python-dotenv==1.0.0         # 環境変数
+openai                  # Whisper API
+python-dotenv          # 環境変数
 ```
 
 ### ファイル構成
 ```
-voice-memo-transcriber/
-├── .env                    # GEMINI_API_KEY
-├── .gitignore
-├── requirements.txt
-├── transcribe.py           # メインスクリプト（200-300行）
-└── .processed_files.txt    # 処理済みリスト
+realtime_transcriber_benchmark_research/
+├── .env                    # OPENAI_API_KEY
+├── .env.example            # APIキーサンプル
+├── requirements.txt        # 依存関係（2行）
+├── transcribe_api.py       # メインスクリプト（50行）
+└── archive_phase1_local_whisper/  # 旧実装アーカイブ
 ```
 
-### faster-whisper選択理由
-- whisper.cppよりIntel CPUで**5倍高速**
-- セットアップ簡単（`pip install`のみ）
-- 量子化なしでシンプル
-- VADフィルタ内蔵
+### OpenAI Whisper API選択理由
+- セットアップ簡単（APIキーのみ）
+- ローカルモデル不要
+- 高速処理（API並列処理）
+- 常に最新モデル
 
 ## 制約条件
 
-- Intel MacBook Pro（Apple Silicon非対応）
-- Core ML/ANE加速は利用不可
-- iCloud同期に依存
-- macOS Sonoma (14.x) 以降のみ対応
+- インターネット接続必須
+- OpenAI APIキー必要
+- ファイルサイズ上限25MB
 
-## MVP リスクと対策
+## リスクと対策
 
-1. **Intel Mac性能**: 処理速度が遅い可能性
-   - 対策: mediumモデルで十分高速（60分→4分）
-2. **Gemini APIレート制限**: 1日60リクエスト
-   - 対策: MVP範囲なら十分
+1. **APIコスト**: 従量課金
+   - 対策: 小さい音声で先にテスト
+2. **ファイルサイズ制限**: 25MB
+   - 対策: Phase 5で分割処理検討
 
-## 次のステップ（MVP）
+## 次のステップ（Phase 3）
 
-1. ✅ 技術リサーチ完了
-2. ✅ MVP範囲確定
-3. ⬜ transcribe.py実装（200-300行）
-4. ⬜ requirements.txt作成
-5. ⬜ 動作テスト
+1. ⬜ transcribe_api.py実装（50行）
+2. ⬜ requirements.txt作成（2行）
+3. ⬜ .env.example作成
+4. ⬜ 動作テスト
 
-## 将来の拡張（MVP後）
+## 将来の拡張（Phase 3完了後）
 
-MVPで不便な場合のみ追加:
-- watchdog自動監視
-- Whisper API fallback
-- バッチ処理最適化
-- Web UI
+**Phase 4: 要約機能**（Phase 3テスト完了後）
+- Gemini API統合
+- Markdown出力
+
+**Phase 5: 自動ファイル検出**（Phase 4テスト完了後）
+- iCloudフォルダ監視
+- 新規ファイル自動処理

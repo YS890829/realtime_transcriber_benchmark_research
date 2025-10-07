@@ -1,0 +1,215 @@
+# Progress Tracking (MVP)
+
+## マイルストーン
+
+### ✅ Phase 0: プロジェクト初期化（完了）
+- [x] プロジェクトディレクトリ作成
+- [x] 技術リサーチ実施
+- [x] メモリーバンク構築
+- [x] MVP範囲確定
+- [x] 技術スタック選定（最小構成）
+
+**完了日**: 2025-10-05
+
+### ✅ Phase 1: MVP実装（完了）
+**目標**: 単一スクリプトでボイスメモ文字起こし＆要約
+
+#### タスク
+- [x] transcribe.py実装（215行）
+  - [x] find_new_files() 関数
+  - [x] transcribe_audio() 関数
+  - [x] summarize_text() 関数
+  - [x] save_output() 関数
+  - [x] main() 関数
+- [x] requirements.txt作成
+- [x] .env.example作成
+- [x] .gitignore作成
+- [x] README.md作成
+- [ ] 動作テスト（ユーザーが手動実行）
+  - [ ] 環境セットアップ
+  - [ ] 新規ファイル検出
+  - [ ] 文字起こし動作確認
+  - [ ] 要約生成確認
+  - [ ] ファイル保存確認
+
+**完了日**: 2025-10-05
+**実績**: 実装100%完了、テスト待ち
+
+### ✅ Phase 2: Unstructured風メタデータ＆話者分離（完了）
+**目標**: データ構造化と話者識別の追加
+
+#### タスク
+- [x] Unstructured.ioリサーチ
+- [x] メタデータ構造設計
+- [x] JSON出力機能実装
+- [x] element_id生成（SHA-256）
+- [x] タイムスタンプメタデータ
+- [x] 話者分離リサーチ（pyannote.audio）
+- [x] pyannote.audio統合
+- [x] speaker_id追加
+- [x] 言語を日本語固定
+- [x] HuggingFaceトークン対応
+
+**完了日**: 2025-10-05
+**実績**: feature/unstructured-metadataブランチで実装完了、テスト待ち
+
+## 完了タスク
+
+### 2025-10-05（初期リサーチ）
+- ✅ Clineメモリーバンクのベストプラクティスリサーチ
+- ✅ iPhoneボイスメモ転送方法リサーチ
+- ✅ Whisper技術調査（ローカル vs API）
+- ✅ LLM要約API比較（Gemini vs Claude）
+- ✅ macOSボイスメモファイルシステム調査
+
+### 2025-10-05（技術選定見直し）
+- ✅ faster-whisper vs whisper.cpp パフォーマンス比較
+- ✅ Whisper large-v3-turbo調査
+- ✅ サブスクリプションプランAPI検証
+- ✅ ローカルLLM調査
+
+### 2025-10-05（MVP範囲確定）
+- ✅ 過剰実装の特定（8つの不要機能削除）
+- ✅ 単一スクリプト化（2000行→200-300行）
+- ✅ メモリーバンク更新（MVP版）
+  - ✅ projectbrief.md更新
+  - ✅ systemPatterns.md更新
+  - ✅ techContext.md更新
+  - ✅ activeContext.md更新
+  - ✅ progress.md更新
+  - ✅ productContext.md更新
+
+### 2025-10-05（MVP実装完了）
+- ✅ requirements.txt作成（3依存関係）
+- ✅ .env.example作成（Gemini APIキー）
+- ✅ .gitignore作成
+- ✅ transcribe.py実装（215行）
+  - ✅ find_new_files() 関数実装
+  - ✅ transcribe_audio() 関数実装
+  - ✅ summarize_text() 関数実装
+  - ✅ save_output() 関数実装
+  - ✅ mark_as_processed() 関数実装
+  - ✅ main() 関数実装
+- ✅ README.md作成（185行）
+- ✅ Git初期化・4コミット完了
+
+### 2025-10-05（Unstructured風メタデータ＆話者分離実装）
+- ✅ Unstructured.ioリサーチ（オープンソース版分析）
+- ✅ メタデータ構造設計（音声文字起こし向け）
+- ✅ transcribe.py拡張（215行 → 395行、+85行）
+  - ✅ diarize_audio() 関数実装（話者分離）
+  - ✅ get_speaker_for_segment() 関数実装
+  - ✅ JSON出力機能追加（_structured.json）
+  - ✅ element_id生成（SHA-256ハッシュ）
+  - ✅ speaker_id追加（SPEAKER_00等）
+  - ✅ 言語を日本語固定
+- ✅ requirements.txt更新（4依存関係、pyannote.audio追加）
+- ✅ .env.example更新（HF_TOKEN追加）
+- ✅ README.md更新（JSON出力例、Unstructuredベンチマーク追加）
+- ✅ feature/unstructured-metadataブランチ・3コミット完了
+
+## Phase 2で追加した機能
+
+### ✅ 実装済み
+- ✅ **JSON出力**（_structured.json）← MVP範囲外だったが追加
+- ✅ **Unstructured風メタデータ構造**
+- ✅ **話者分離**（pyannote.audio）
+- ✅ **element_id**（SHA-256ハッシュ）
+- ✅ **speaker_id**（SPEAKER_00, SPEAKER_01等）
+- ✅ **日本語固定**（言語検出除外）
+
+## MVPで削除した機能
+
+### 実装から除外
+- ❌ watchdog自動監視（手動実行で十分）
+- ❌ Whisper API fallback（faster-whisperのみ）
+- ❌ Claude API（Gemini APIのみ）
+- ❌ Strategy Pattern（単純な関数）
+- ❌ リトライロジック（エラーログのみ）
+- ❌ バッチ処理最適化（単純なループ）
+- ❌ SQLite/DB（.processed_files.txtのみ）
+- ❌ macOS通知（ログ出力のみ）
+- ❌ ログファイル（標準出力のみ）
+
+### MVP後に検討
+不便を感じた場合のみ追加:
+- watchdog自動監視
+- モデルサイズ選択
+- バッチ処理最適化
+- Web UI
+
+## メトリクス
+
+### 開発進捗
+- **全体進捗**: 98% (Phase 2実装完了、テスト待ち)
+- **Phase 0（計画）**: 100% ✅
+- **Phase 1（MVP実装）**: 100% ✅
+- **Phase 2（メタデータ＆話者分離）**: 100% ✅
+
+### コード統計（Phase 2実績）
+- **実装総行数**: 395行（transcribe.py）← 215行から+85行
+- **ファイル数**: 7ファイル
+  - transcribe.py (395行) ← 215行から拡張
+  - requirements.txt (4行) ← pyannote.audio追加
+  - .env.example (9行) ← HF_TOKEN追加
+  - .gitignore (22行)
+  - README.md (270行) ← JSON出力例追加
+  - memory-bank/ (6ファイル、更新中)
+- **Git コミット**:
+  - mainブランチ: 5コミット
+  - feature/unstructured-metadata: +3コミット
+- **機能拡張**:
+  - JSON出力追加（Unstructured風）
+  - 話者分離追加（pyannote.audio）
+  - メタデータ大幅拡充
+
+### MVPパフォーマンス目標
+| 指標 | 目標値 | 現状 |
+|------|--------|------|
+| 処理速度（60分音声） | 4分以内 | テスト待ち |
+| メモリ使用量 | ~3GB | テスト待ち |
+| 成功率 | 動作すればOK | テスト待ち |
+
+## 既知の課題
+
+### MVP技術的課題
+なし（Phase 0のみ完了）
+
+### MVP後に確認
+1. **実機パス確認**: macOS Sonoma以降で固定パス検証
+2. **処理速度実測**: 実機でベンチマーク
+3. **無料枠の十分性**: Gemini API 1日60リクエストで十分か
+
+## MVP学習ログ
+
+### 得られた知見
+1. **faster-whisperの圧倒的性能**: Intel CPUでwhisper.cppより5倍高速
+2. **量子化不要**: デフォルト設定で十分高速、デバッグ容易
+3. **Gemini フリーティア**: 1日60リクエストでMVP範囲では十分
+4. **サブスクリプションプランの制限**: APIアクセス不可（全プラン共通）
+5. **単一スクリプトの有効性**: 200-300行で完結、メンテナンス容易
+
+### MVPベストプラクティス
+1. **シンプルさ優先**: 複雑な設計パターンを避ける
+2. **手動実行**: 自動化は必要になってから
+3. **デフォルト設定**: 最適化は実測後に
+4. **テキストファイル管理**: grep可能で十分
+
+## 次のアクション
+
+### 最優先（MVP実装）
+1. **transcribe.py作成**: 200-300行の単一スクリプト
+2. **requirements.txt作成**: 3つのパッケージ
+3. **.env.example作成**: GEMINI_API_KEY
+
+### MVP完了後
+1. 動作テスト
+2. 実機での検証
+3. 不便な点の特定→拡張検討
+
+## 更新履歴
+
+- **2025-10-05 09:00**: 初版作成、Phase 0完了記録
+- **2025-10-05 14:00**: MVP版に更新、不要な複雑さを削除
+- **2025-10-05 16:40**: MVP実装完了、進捗100%に更新
+- **2025-10-05 18:00**: Phase 2実装完了（Unstructured風メタデータ＆話者分離）

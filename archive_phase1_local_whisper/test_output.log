@@ -1,0 +1,14 @@
+2025-10-06 15:20:30,784 - INFO - === 単一ファイルテスト開始: Test Recording.m4a ===
+2025-10-06 15:20:30,784 - INFO - ファイルサイズ: 101.3 MB
+2025-10-06 15:20:30,784 - INFO - 話者分離を実行中...
+2025-10-06 15:20:30,784 - INFO - 話者分離中: Test Recording.m4a
+2025-10-06 15:20:30,784 - WARNING - HF_TOKENが設定されていません。話者分離をスキップします
+2025-10-06 15:20:30,784 - INFO - 文字起こしを実行中...
+2025-10-06 15:20:30,784 - INFO - 文字起こし中: Test Recording.m4a
+[2025-10-06 15:20:41.272] [ctranslate2] [thread 1860781] [warning] The compute type inferred from the saved model is float16, but the target device or backend do not support efficient float16 computation. The model weights have been automatically converted to use the float32 compute type instead.
+2025-10-06 15:20:52,967 - INFO - Processing audio with duration 01:48:16.617
+2025-10-06 15:21:49,250 - INFO - VAD filter removed 37:22.473 of audio
+OMP: Error #15: Initializing libiomp5.dylib, but found libiomp5.dylib already initialized.
+OMP: Hint This means that multiple copies of the OpenMP runtime have been linked into the program. That is dangerous, since it can degrade performance or cause incorrect results. The best thing to do is to ensure that only a single OpenMP runtime is linked into the process, e.g. by avoiding static linking of the OpenMP runtime in any library. As an unsafe, unsupported, undocumented workaround you can set the environment variable KMP_DUPLICATE_LIB_OK=TRUE to allow the program to continue to execute, but that may cause crashes or silently produce incorrect results. For more information, please see http://www.intel.com/software/products/support/.
+/usr/local/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

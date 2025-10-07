@@ -1,10 +1,10 @@
-# Active Context (Phase 3: 超シンプル版)
+# Active Context (MVP)
 
 ## 現在のフォーカス
 
-**Phase**: Phase 3実装準備（超シンプル版）
-**Status**: メモリーバンク刷新完了、実装未開始
-**アーカイブ**: Phase 1-2は archive_phase1_local_whisper/ に移動済み
+**Phase**: Phase 2実装完了（Unstructured風メタデータ＆話者分離）
+**Status**: 実装100%完了、テスト待ち
+**Branch**: feature/unstructured-metadata
 
 ### 現在の作業
 - ✅ Phase 1（MVP）実装完了（mainブランチ、transcribe.py 215行）

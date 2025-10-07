@@ -1,35 +1,39 @@
-# System Patterns (Phase 3: 超シンプル版)
+# System Patterns (MVP)
 
-## Phase 3: 超シンプル版アーキテクチャ
-
-### 設計原則
-1. **KISS**: Keep It Simple, Stupid（50行で完結）
-2. **段階的拡張**: Phase 3→4→5で機能追加
-3. **初学者優先**: 全コードが理解可能
-4. **デバッグ容易**: エラー箇所が一目瞭然
-
-### コードフロー（Phase 3）
+## MVPアーキテクチャ（シンプル化）
 
 ```
-ユーザー
-  ↓
-  python transcribe_api.py "audio.m4a"
-  ↓
-main()
-  ├─ コマンドライン引数チェック
-  ├─ ファイル存在確認
-  ↓
-transcribe_audio()
-  ├─ OpenAI クライアント初期化
-  ├─ Whisper API 呼び出し
-  ├─ 文字起こし結果取得
-  ↓
-save_text()
-  ├─ テキストファイル保存
-  ├─ 完了メッセージ表示
-  ↓
-終了
+┌─────────────────┐
+│  iPhone 17      │
+│  ボイスメモ App │
+└────────┬────────┘
+         │ iCloud Sync
+         ↓
+┌─────────────────────────────────────────────┐
+│  Intel MacBook Pro                           │
+│                                              │
+│  ┌────────────────────────────────────┐    │
+│  │  transcribe.py (単一スクリプト)     │    │
+│  │                                     │    │
+│  │  1. 新規ファイル検出                │    │
+│  │     ↓                               │    │
+│  │  2. faster-whisper 文字起こし        │    │
+│  │     ↓                               │    │
+│  │  3. Gemini API 要約                 │    │
+│  │     ↓                               │    │
+│  │  4. TXT + Markdown 保存             │    │
+│  │     ↓                               │    │
+│  │  5. .processed_files.txt 更新       │    │
+│  └────────────────────────────────────┘    │
+└─────────────────────────────────────────────┘
 ```
+
+**MVPで削除した複雑さ**:
+- ❌ watchdog自動監視 → 手動実行
+- ❌ Whisper API fallback → faster-whisperのみ
+- ❌ Claude API → Gemini APIのみ
+- ❌ Strategy Pattern → 単純な関数
+- ❌ 複雑なエラーハンドリング → ログ出力のみ
 
 ## MVP実装（シンプルな関数構成）
 

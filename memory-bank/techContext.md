@@ -1,283 +1,299 @@
-# Technical Context (MVP)
+# Technical Context (Phase 3: 超シンプル版)
 
-## MVP技術スタック（最小構成）
+## 技術スタック
 
-### コア言語
-- **Python**: 3.10以上
-- **パッケージ管理**: pip + requirements.txt
+### Phase 3: 超シンプル版
+| 技術 | バージョン | 用途 | 理由 |
+|------|-----------|------|------|
+| Python | 3.11+ | 実行環境 | 標準的な選択 |
+| openai | 最新 | Whisper API | 公式SDKで簡単 |
+| python-dotenv | 最新 | 環境変数管理 | APIキー管理 |
 
-### MVP必須ライブラリ（Phase 1: 3つ）
-```python
-# faster-whisper - ローカル文字起こし
-faster-whisper==1.0.0
+### Phase 4で追加予定
+| 技術 | 用途 |
+|------|------|
+| google-generativeai | Gemini APIで要約 |
 
-# google-generativeai - Gemini API要約
-google-generativeai==0.4.0
+### Phase 5で追加予定
+| 技術 | 用途 |
+|------|------|
+| なし | 標準ライブラリのみで実装 |
 
-# python-dotenv - 環境変数管理
-python-dotenv==1.0.0
+## アーキテクチャ
+
+### Phase 3: 超シンプル版（50行）
+
+```
+transcribe_api.py
+  ↓
+  main()                    # CLI引数処理
+    ↓
+    transcribe_audio()      # OpenAI API呼び出し
+    ↓
+    save_text()             # テキスト保存
 ```
 
-### Phase 2追加ライブラリ（話者分離）
-```python
-# pyannote.audio - 話者分離
-pyannote.audio==3.1.1
+**特徴**:
+- 一直線の処理フロー
+- 関数3つのみ
+- エラーハンドリング最小限
+
+### Phase 4: 要約機能追加（+30行）
+
+```
+transcribe_api.py
+  ↓
+  main()
+    ↓
+    transcribe_audio()      # OpenAI API
+    ↓
+    summarize_text()        # Gemini API（新規）
+    ↓
+    save_text()             # TXT保存
+    ↓
+    save_markdown()         # Markdown保存（新規）
 ```
 
-**Phase 2で追加した依存関係**: pyannote.audio（話者分離）
-- HuggingFaceトークン必要（無料）
-- モデル: pyannote/speaker-diarization-3.1
-- CPU対応（Intel Mac可）
-- ライセンス: MIT
+### Phase 5: 自動検出追加（+50行）
 
-### MVPで削除したライブラリ
+```
+transcribe_api.py
+  ↓
+  main()
+    ↓
+    find_new_files()        # iCloud監視（新規）
+    ↓
+    for file in new_files:
+        transcribe_audio()
+        summarize_text()
+        save_text()
+        save_markdown()
+        mark_as_processed() # 処理済み記録（新規）
+```
+
+## OpenAI Whisper API仕様
+
+### エンドポイント
+```
+POST https://api.openai.com/v1/audio/transcriptions
+```
+
+### リクエスト（Phase 3実装）
 ```python
-# ❌ watchdog（手動実行）
-# ❌ pydub（faster-whisperが音声処理）
-# ❌ openai（Whisper API不使用）
-# ❌ anthropic（Claude API不使用）
-# ❌ loguru（標準loggingで十分）
-# ❌ tqdm（不要）
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+with open(audio_file_path, "rb") as audio_file:
+    response = client.audio.transcriptions.create(
+        model="whisper-1",      # 最新モデル
+        file=audio_file,        # 音声ファイル
+        language="ja"           # 日本語指定
+    )
+
+text = response.text  # 文字起こし結果
+```
+
+### レスポンス形式
+```python
+# デフォルト（text）
+"これは文字起こし結果のテキストです。"
+```
+
+### サポートファイル形式
+- `.m4a` (iPhoneボイスメモ)
+- `.mp3`
+- `.wav`
+- `.mp4`
+- `.mpeg`
+- `.webm`
+
+### 制約
+- **ファイルサイズ**: 最大25MB
+- **レート制限**: 60リクエスト/分（デフォルト）
+- **価格**: $0.006/分
+
+## Gemini API仕様（Phase 4で実装）
+
+### エンドポイント
+```python
+import google.generativeai as genai
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+response = model.generate_content(f"""
+以下の文字起こしを要約してください:
+
+{transcription}
+""")
+
+summary = response.text
+```
+
+### 価格
+- **フリーティア**: 60リクエスト/日
+- **有料**: $0.00025/1000文字（入力）
+
+## ファイルシステム
+
+### Phase 3: 手動指定
+```bash
+python transcribe_api.py "Test Recording.m4a"
+```
+
+### Phase 5: iCloud自動検出
+```python
+VOICE_MEMO_PATH = os.path.expanduser(
+    "~/Library/Mobile Documents/com~apple~CloudDocs/Documents/VoiceMemoTranscripts"
+)
+```
+
+## エラーハンドリング
+
+### Phase 3: 最小限
+```python
+# ファイル存在チェックのみ
+if not os.path.exists(audio_path):
+    print(f"❌ エラー: ファイルが見つかりません")
+    sys.exit(1)
+```
+
+### Phase 4: API エラー追加
+```python
+try:
+    response = client.audio.transcriptions.create(...)
+except Exception as e:
+    print(f"❌ エラー: {e}")
+    sys.exit(1)
+```
+
+## 環境変数
+
+### Phase 3
+```bash
+OPENAI_API_KEY=sk-...
+```
+
+### Phase 4で追加
+```bash
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=...
+```
+
+## コスト分析
+
+### Phase 3: Whisperのみ
+| 音声長 | Whisper API | 合計 |
+|--------|------------|------|
+| 10分 | $0.06 | **$0.06** |
+| 60分 | $0.36 | **$0.36** |
+
+### Phase 4: 要約追加
+| 音声長 | Whisper API | Gemini API | 合計 |
+|--------|------------|-----------|------|
+| 10分 | $0.06 | $0 (無料枠) | **$0.06** |
+| 60分 | $0.36 | $0 (無料枠) | **$0.36** |
+
+## パフォーマンス
+
+### Phase 3予測
+| 音声長 | 処理時間（推定） | 実測 |
+|--------|----------------|------|
+| 10分 | 10秒 | 未テスト |
+| 60分 | 1分 | 未テスト |
+
+## セキュリティ
+
+### APIキー管理
+```python
+# .envファイルに保存（Gitignore対象）
+OPENAI_API_KEY=sk-...
+
+# .env.exampleで共有
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### .gitignore
+```
+.env
+__pycache__/
+*.pyc
 ```
 
 ## 開発環境
 
-### 必須要件
-- **OS**: macOS 14 (Sonoma) 以上
-- **CPU**: Intel Mac（Core i5以上推奨）
-- **RAM**: 8GB以上（16GB推奨）
-- **ストレージ**: 5GB以上の空き容量
-- **Python**: 3.10+
+### 必須
+- Python 3.11以上
+- pip
+- インターネット接続
 
-### 推奨ツール
-- **エディタ**: VSCode、PyCharm
-- **仮想環境**: venv または Poetry
-- **Git**: バージョン管理
+### 推奨
+- venv（仮想環境）
+- VSCode / PyCharm
 
-## 外部依存関係
+## デプロイ
 
-### システムレベル
+### Phase 3: ローカル実行のみ
 ```bash
-# FFmpeg（音声処理用、faster-whisperが内部で使用）
-brew install ffmpeg
-```
-
-**注意**: faster-whisperはPythonパッケージなので、whisper.cppのような手動ビルドは不要。`pip install faster-whisper`で自動的にCTranslate2がインストールされる。
-
-### macOS権限
-- **Full Disk Access**: `~/Library/Group Containers/` へのアクセス
-- **通知**: 処理完了通知の送信
-
-### API要件
-
-#### Google Gemini API（Phase 1）
-- **APIキー**: [Google AI Studio](https://aistudio.google.com/)から取得
-- **料金**: 無料（1日60リクエスト）
-- **制限**: トークン数上限あり（MVP範囲では十分）
-
-#### HuggingFace API（Phase 2）
-- **トークン**: [HuggingFace Settings](https://huggingface.co/settings/tokens)から取得
-- **モデル利用規約**: [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization)に同意必須
-- **料金**: 無料（推論は無制限）
-- **制限**: モデルダウンロードにトークン必要
-
-**MVPで削除**:
-- ❌ OpenAI Whisper API（faster-whisperのみ）
-- ❌ Anthropic Claude API（Geminiのみ）
-
-## アーキテクチャ制約
-
-### Intel Mac固有の制約
-- **Core ML非対応**: Apple Neural Engine (ANE) は利用不可
-- **whisper.cpp最適化**: AVX2命令セットのみ（AVX-512なし）
-- **処理速度**: Apple Silicon（M1/M2）の約1/3〜1/5
-
-### ファイルシステム制約
-- **ボイスメモパス**: `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/` (macOS Sonoma以降固定)
-- **iCloud同期遅延**: ファイルがすぐに利用可能でない場合あり
-
-### ネットワーク制約
-- **API依存**: インターネット接続必須（API使用時）
-- **レート制限**: API呼び出し頻度制限
-- **タイムアウト**: 長時間リクエストの処理
-
-## セキュリティ考慮事項
-
-### APIキー管理
-```python
-# .env ファイル（Gitには含めない）
-GEMINI_API_KEY=AI...
-HF_TOKEN=hf_...
-```
-
-### ファイルアクセス権限
-- Voice Memosフォルダへの読み取り専用アクセス
-- 出力ディレクトリへの書き込み権限
-
-### データプライバシー
-- ローカル処理優先でAPI送信を最小化
-- API通信はHTTPS暗号化
-- ログファイルに機密情報を含めない
-
-## パフォーマンス要件
-
-### MVP処理速度目標（Intel Mac、mediumモデル）
-| 音声長 | 処理時間 |
-|--------|----------|
-| 10分   | ~40秒   |
-| 30分   | ~2分    |
-| 60分   | ~4分    |
-
-**注**: whisper.cppより約**5倍高速**
-
-### MVPメモリ使用量（mediumモデル、量子化なし）
-| 項目 | 使用量 |
-|------|--------|
-| メモリ | ~3GB |
-| RAM推奨 | 8GB+ |
-
-**推奨理由**: デフォルト設定（量子化なし）でバグ修正が容易
-
-### MVPディスク使用量
-| 項目 | サイズ |
-|------|--------|
-| faster-whisper パッケージ | ~100MB |
-| medium モデル | ~3GB |
-| Python環境 | ~500MB |
-| **合計** | **~3.5GB** |
-
-## 開発ワークフロー
-
-### MVPプロジェクト構造（最小構成）
-
-**Phase 1（mainブランチ）**:
-```
-voice-memo-transcriber/
-├── .env                    # GEMINI_API_KEY
-├── .gitignore
-├── requirements.txt        # 3つのパッケージ
-├── transcribe.py           # メインスクリプト（215行）
-└── .processed_files.txt    # 処理済みリスト
-```
-
-**Phase 2（feature/unstructured-metadataブランチ）**:
-```
-voice-memo-transcriber/
-├── .env                    # GEMINI_API_KEY, HF_TOKEN
-├── .gitignore
-├── requirements.txt        # 4つのパッケージ（+pyannote.audio）
-├── transcribe.py           # メインスクリプト（395行）
-├── .processed_files.txt    # 処理済みリスト
-└── outputs/
-    ├── {filename}.txt           # 文字起こし全文
-    ├── {filename}_summary.md    # 要約（Markdown）
-    └── {filename}_structured.json # Unstructured風メタデータ（Phase 2追加）
-```
-
-**MVPで削除**:
-- ❌ src/ディレクトリ構造（単一ファイル）
-- ❌ config/設定管理（.envのみ）
-- ❌ tests/（MVP後に追加）
-- ❌ utils/（標準ライブラリで十分）
-
-### MVP環境セットアップ（シンプル化）
-
-**Phase 1（mainブランチ）**:
-```bash
-# 1. Python仮想環境作成
-python3 -m venv venv
-source venv/bin/activate
-
-# 2. 依存関係インストール（3つのみ）
+# セットアップ
 pip install -r requirements.txt
 
-# 3. FFmpegインストール
-brew install ffmpeg
-
-# 4. 環境変数設定
-echo "GEMINI_API_KEY=your_key_here" > .env
-
-# 5. 実行（初回はモデル自動ダウンロード）
-python transcribe.py
+# 実行
+python transcribe_api.py "audio.m4a"
 ```
 
-**Phase 2（feature/unstructured-metadataブランチ）**:
-```bash
-# 1. ブランチ切り替え
-git checkout feature/unstructured-metadata
+### Phase 5: 自動実行（検討中）
+- launchd（macOS）
+- cron
 
-# 2. Python仮想環境作成
-python3 -m venv venv
-source venv/bin/activate
+## テスト戦略
 
-# 3. 依存関係インストール（4つ: +pyannote.audio）
-pip install -r requirements.txt
+### Phase 3
+1. **10分音声**: 最初のテスト
+2. **エラーケース**: ファイルなし
+3. **日本語音声**: 精度確認
 
-# 4. FFmpegインストール
-brew install ffmpeg
+### Phase 4
+1. **要約品質**: 長文でテスト
+2. **Markdown出力**: フォーマット確認
 
-# 5. 環境変数設定（2つのAPI）
-cat > .env << EOF
-GEMINI_API_KEY=your_gemini_key_here
-HF_TOKEN=your_huggingface_token_here
-EOF
+### Phase 5
+1. **自動検出**: iCloudフォルダ監視
+2. **処理済み管理**: 重複処理防止
 
-# 6. 実行（初回はモデル自動ダウンロード: Whisper + pyannote）
-python transcribe.py
-```
+## ベストプラクティス
 
-**MVPで削除**:
-- ❌ リポジトリクローン（ローカル開発）
-- ❌ テスト（MVP後に追加）
+### Phase 3設計思想
+1. **KISS原則**: Keep It Simple, Stupid
+2. **段階的拡張**: Phase 3→4→5
+3. **テスト駆動**: 動作確認してから次へ
+4. **初学者優先**: 全コードが理解可能
 
-## MVP実行方法（シンプル化）
+### コーディング規約
+- 関数は1つの責務のみ
+- コメントで目的を明記
+- エラーメッセージは日本語
+- print文でデバッグ
 
-### 起動
-```bash
-# 手動実行（新規ファイルを処理）
-python transcribe.py
-```
+## 技術的負債
 
-### ログ出力
-```bash
-# 標準出力に表示
-INFO: 新規ファイル検出: meeting_20251005.m4a
-INFO: 文字起こし中...
-INFO: 要約生成中...
-INFO: ✅ 処理完了: meeting_20251005.m4a
-```
+### Phase 3で意図的に残す
+- エラーリトライなし（手動再実行）
+- ログファイルなし（標準出力のみ）
+- 設定ファイルなし（ハードコード）
 
-**MVPで削除**:
-- ❌ デーモンモード（手動実行のみ）
-- ❌ ログファイル（標準出力のみ）
-- ❌ macOS通知（ログ出力のみ）
-- ❌ 処理統計（不要）
+### Phase 4-5で対応予定
+- 要約機能（Phase 4）
+- 自動検出（Phase 5）
 
-## MVPトラブルシューティング
+## 参考リソース
 
-### よくある問題
+### 公式ドキュメント
+- [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text)
+- [Gemini API](https://ai.google.dev/docs) (Phase 4)
 
-#### 1. ボイスメモフォルダが見つからない
-```bash
-# macOS Sonoma以降を確認
-sw_vers
+### Phase 1-2アーカイブ
+- `archive_phase1_local_whisper/memory-bank/` - 旧実装の詳細
 
-# パスを確認
-ls ~/Library/Group\ Containers/group.com.apple.VoiceMemos.shared/Recordings/
-```
+## 更新履歴
 
-#### 2. Gemini APIエラー
-- APIキーを確認: `echo $GEMINI_API_KEY`
-- 1日60リクエスト制限を確認
-
-#### 3. メモリ不足
-- mediumモデルで8GB RAM必要
-- 他のアプリを終了
-
-## MVP後の拡張候補
-
-MVPで不便を感じた場合のみ追加:
-- watchdog自動監視
-- Whisper API fallback
-- バッチ処理最適化
-- Web UI
+- **2025-10-07 12:00**: Phase 3版に刷新、超シンプル構成
