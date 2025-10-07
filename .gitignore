@@ -23,3 +23,7 @@ Thumbs.db
 
 # Project specific
 .processed_files.txt
+
+# Output files (Phase 3+)
+*_transcription.txt
+*_summary.md
