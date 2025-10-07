@@ -2,22 +2,60 @@
 
 ## 現在のフォーカス
 
-**Phase**: Phase 3実装準備（超シンプル版）
-**Status**: メモリーバンク刷新完了、実装未開始
+**Phase**: Phase 3実装完了、テスト待ち（超シンプル版）
+**Status**: transcribe_api.py実装完了、OpenAI APIキー設定待ち
 **アーカイブ**: Phase 1-2は archive_phase1_local_whisper/ に移動済み
 
-### 現在の作業
-- ✅ Phase 1（MVP）実装完了（mainブランチ、transcribe.py 215行）
-- ✅ Phase 2実装完了（feature/unstructured-metadataブランチ、transcribe.py 395行）
-- ✅ Unstructured.io風メタデータ追加
-- ✅ 話者分離追加（pyannote.audio）
-- ✅ JSON出力機能追加
-- ✅ Git 3コミット完了（feature/unstructured-metadataブランチ）
-- ⏳ ユーザーによる動作テスト待ち（テスト後にmainブランチへマージ）
+## 開発スタイル（重要）
+
+### ステップバイステップ実装・テスト・コミット
+このプロジェクトでは以下のスタイルを厳守します:
+
+1. **実装**: 機能を実装
+2. **テスト**: 動作確認
+3. **コミット**: 各テスト完了ごとにコミット
+4. **次へ**: 次の機能に進む
+
+**理由**:
+- エラー発生時に原因特定が容易
+- 各ステップで動作を確認
+- Git履歴が明確
+- ロールバックが簡単
+
+**具体例（Phase 3）**:
+1. transcribe_api.py実装 → コミット
+2. requirements.txt更新 → (1と一緒にコミット)
+3. .env.example作成 → (1と一緒にコミット)
+4. 依存関係インストール → テスト
+5. 動作テスト（APIキー設定後） → テスト完了後コミット
+6. Phase 3完了 → 最終コミット
+
+このスタイルはPhase 4, Phase 5でも継続します。
+
+### 現在の作業（Phase 3）
+- ✅ Phase 1-2アーカイブ完了
+- ✅ メモリーバンク刷新完了
+- ✅ transcribe_api.py実装完了（81行）
+- ✅ requirements.txt更新完了
+- ✅ .env.example作成完了
+- ✅ 依存関係インストール完了
+- ✅ Git 2コミット完了
+- ⏳ OpenAI APIキー設定待ち
+- ⬜ 動作テスト実施
+- ⬜ テスト完了コミット
 
 ## 最近の変更
 
-### 2025-10-05（初期リサーチ）
+### 2025-10-07（Phase 3実装完了）
+- **アーカイブ**: Phase 1-2を archive_phase1_local_whisper/ に移動
+- **実装完了**:
+  - transcribe_api.py（81行、超シンプル版）
+  - requirements.txt（openai, python-dotenvのみ）
+  - .env.example（OPENAI_API_KEYのみ）
+- **Git管理**: 2コミット完了
+- **次のステップ**: OpenAI APIキー設定 → 動作テスト
+
+### 2025-10-05（Phase 1-2: アーカイブ済み）
 - **プロジェクト初期化**: 新規プロジェクトとして開始
 - **リサーチ実施**:
   - Clineメモリーバンク構造のベストプラクティス調査
