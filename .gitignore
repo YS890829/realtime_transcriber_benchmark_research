@@ -27,3 +27,13 @@ Thumbs.db
 # Output files (Phase 3+)
 *_transcription.txt
 *_summary.md
+output/
+
+# Google Drive API (Phase 5)
+credentials.json
+token.json
+downloads/
+.processed_drive_files.txt
+
+# Phase 5-3 (FastAPI + Push通知)
+webhook_server.py
