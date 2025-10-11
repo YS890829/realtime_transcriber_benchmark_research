@@ -38,3 +38,6 @@ downloads/
 # Phase 5-3 (FastAPI + Push通知)
 .start_page_token.txt
 .channel_info.json
+
+# Phase 6-3 (Vector DB + Semantic Search)
+chroma_db/
