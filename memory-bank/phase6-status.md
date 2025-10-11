@@ -248,5 +248,12 @@
 - HUGGINGFACE_TOKEN: 設定済み（[REDACTED]）
 
 ### テストファイル
-`downloads/Test Recording.m4a` (101MB, 108.3分)
-- Phase 6-1, 6-2, 6-3のすべてのテストで使用
+**メインテストファイル:** `downloads/Test Recording_20min.m4a` (18MB, 20分)
+- **Phase 6-1, 6-2, 6-3のすべてのテストで使用**
+- Test Recording.m4aの最初の20分を抽出（ffmpeg使用）
+- 処理時間が短く、実用的なテストが可能
+- Phase 6-1テスト結果: 4,035文字、489セグメント、2,656単語タイムスタンプ
+- Phase 6-2テスト結果: 4トピック、2名の人物、12組織
+
+**元ファイル（参考）:** `downloads/Test Recording.m4a` (101MB, 108.3分)
+- 長時間処理テスト用（必要な場合のみ使用）
