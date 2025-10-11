@@ -7,6 +7,8 @@
 
 import os
 import sys
+import subprocess
+from pathlib import Path
 from openai import OpenAI
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -14,9 +16,50 @@ import google.generativeai as genai
 # .envファイルを読み込み
 load_dotenv()
 
+# OpenAI Whisper API file size limit (25MB)
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB in bytes
+
+
+def split_audio_file(file_path, chunk_duration=600):
+    """
+    Split large audio file into chunks using ffmpeg
+
+    引数:
+        file_path: 音声ファイルのパス
+        chunk_duration: チャンクごとの秒数（デフォルト: 10分 = 600秒）
+
+    戻り値:
+        チャンクファイルのパスリスト
+    """
+    file_path = Path(file_path)
+    output_dir = file_path.parent / f"{file_path.stem}_chunks"
+    output_dir.mkdir(exist_ok=True)
+
+    # ffmpegで分割
+    output_pattern = str(output_dir / f"chunk_%03d{file_path.suffix}")
+
+    cmd = [
+        'ffmpeg',
+        '-i', str(file_path),
+        '-f', 'segment',
+        '-segment_time', str(chunk_duration),
+        '-c', 'copy',
+        output_pattern
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        raise Exception(f"ffmpeg failed: {result.stderr}")
+
+    # 作成されたチャンクのリストを取得
+    chunks = sorted(output_dir.glob(f"chunk_*{file_path.suffix}"))
+    return chunks
+
+
 def transcribe_audio(file_path):
     """
-    OpenAI Whisper APIで音声ファイルを文字起こし
+    OpenAI Whisper APIで音声ファイルを文字起こし（大容量ファイル対応）
 
     引数:
         file_path: 音声ファイルのパス（.m4a, .mp3, .wav等）
@@ -27,16 +70,51 @@ def transcribe_audio(file_path):
     # OpenAIクライアント初期化
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    # 音声ファイルを開く
-    with open(file_path, "rb") as audio_file:
-        # Whisper APIで文字起こし
-        response = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            language="ja"  # 日本語指定
-        )
+    file_size = os.path.getsize(file_path)
 
-    return response.text
+    # ファイルサイズチェック（25MB超過の場合は分割）
+    if file_size > MAX_FILE_SIZE:
+        print(f"  File size: {file_size / 1024 / 1024:.1f}MB (exceeds 25MB limit)")
+        print(f"  Splitting into chunks...")
+
+        chunks = split_audio_file(file_path)
+        print(f"  Created {len(chunks)} chunks")
+
+        # 各チャンクを文字起こし
+        transcriptions = []
+        for i, chunk_path in enumerate(chunks, 1):
+            print(f"  Transcribing chunk {i}/{len(chunks)}...", end='\r')
+
+            with open(chunk_path, "rb") as audio_file:
+                response = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="ja"
+                )
+
+            transcriptions.append(response.text)
+
+        print()  # 改行
+
+        # チャンクを削除
+        for chunk in chunks:
+            chunk.unlink()
+        chunks[0].parent.rmdir()
+
+        # 文字起こし結果を結合
+        return "\n\n".join(transcriptions)
+
+    else:
+        # ファイルサイズが25MB以下の場合は通常処理
+        with open(file_path, "rb") as audio_file:
+            # Whisper APIで文字起こし
+            response = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language="ja"  # 日本語指定
+            )
+
+        return response.text
 
 def summarize_text(text):
     """
