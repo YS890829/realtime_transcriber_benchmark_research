@@ -1,0 +1,44 @@
+{
+  "defaultMode": "acceptEdits",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "Bash(python*)",
+      "Bash(/usr/local/opt/python@3.11/bin/python3.11*)",
+      "Bash(PYTHONPATH=\"$PWD/venv/lib/python3.11/site-packages\"*)",
+      "Bash(PYTHONPATH=*)",
+      "Bash(*python*)",
+      "Bash(pip*)",
+      "Bash(git*)",
+      "Bash(ls*)",
+      "Bash(mkdir*)",
+      "Bash(cat*)",
+      "Bash(grep*)",
+      "Bash(find*)",
+      "Bash(cd*)",
+      "Bash(echo*)",
+      "Bash(pwd*)",
+      "Bash(which*)",
+      "Bash(wc*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(tree*)",
+      "Glob",
+      "Grep",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch",
+      "Task",
+      "SlashCommand"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(sudo*)",
+      "Bash(curl*)",
+      "Bash(wget*)"
+    ]
+  }
+}
