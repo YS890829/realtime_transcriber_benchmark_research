@@ -6,8 +6,8 @@ monitors My Drive/audio folder every 5 minutes and auto-transcribes new files
 
 import os
 import time
-import subprocess
 from pathlib import Path
+import subprocess
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
