@@ -36,4 +36,5 @@ downloads/
 .processed_drive_files.txt
 
 # Phase 5-3 (FastAPI + Push通知)
-webhook_server.py
+.start_page_token.txt
+.channel_info.json
