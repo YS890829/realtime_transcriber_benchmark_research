@@ -74,58 +74,68 @@
 - 初回実行時はブラウザ認証が必要
 - 2回目以降はtoken.jsonで自動認証
 
-### ⬜ Phase 5-2: Google Driveポーリング自動検知（未開始）
+### ✅ Phase 5-2: Google Driveポーリング自動検知（完了）
 **目標**: Google Driveの`audio`フォルダ（My Drive直下）に新規ファイルが追加されたら自動で文字起こし（ポーリング方式）
 
 **前提条件**: Phase 5-1が動作すること
 
 **監視対象フォルダ**: Google Driveの`My Drive/audio`フォルダ（今後の音声ファイル保存先）
 
-#### タスク
-- [ ] monitor_drive.py実装（~100行）
-  - [ ] Google Drive認証（token.json再利用）
-  - [ ] My Drive/audioフォルダのID取得
-  - [ ] 5分間隔でaudioフォルダをチェック
-  - [ ] 処理済みファイルリスト管理（.processed_drive_files.txt）
-  - [ ] 新規ファイル検出 → ダウンロード → 文字起こし → 要約
-- [ ] 動作テスト
-  - [ ] ポーリング動作テスト
-  - [ ] 新規ファイル検出テスト
-  - [ ] 自動文字起こしテスト
-  - [ ] 処理済みリスト管理テスト
+#### 完了タスク
+- [x] monitor_drive.py実装（218行）
+  - [x] Google Drive認証（token.json再利用）
+  - [x] My Drive/audioフォルダのID取得
+  - [x] 5分間隔でaudioフォルダをチェック
+  - [x] 処理済みファイルリスト管理（.processed_drive_files.txt）
+  - [x] 新規ファイル検出 → ダウンロード → 文字起こし → 要約
+  - [x] 25MB超過ファイル自動分割（ffmpeg使用）
+- [x] 動作テスト
+  - [x] ポーリング動作テスト
+  - [x] 新規ファイル検出テスト（101MB大容量ファイル含む）
+  - [x] 自動文字起こしテスト
+  - [x] 処理済みリスト管理テスト
 
 **検知方式**: 定期的な調査（最大5分遅延あり）
 
 **使い方**: `python monitor_drive.py`（ターミナルで実行、Ctrl+Cで停止）
 
-**完了条件**: Google Driveへの新規アップロードを検知し、自動文字起こし成功
+**完了条件**: ✅ Google Driveへの新規アップロードを検知し、自動文字起こし成功
 
-### ⬜ Phase 5-3: FastAPI + Push通知リアルタイム検知（未開始）
+**完了日**: 2025-10-11
+
+**テスト実績**:
+- Seven Eleven Soka Kitaya 1Chome-Shop 10.m4a (178KB)
+- Seven Eleven Soka Kitaya 1Chome-Shop 11.m4a (206KB)
+- Test Recording.m4a (101MB) - 11チャンクに分割処理成功
+
+### ✅ Phase 5-3: FastAPI + Push通知リアルタイム検知（完了）
 **目標**: Google Driveの`audio`フォルダにファイル作成時、リアルタイムで検知し即座に文字起こし（Push通知方式）
 
 **前提条件**: Phase 5-2が動作すること
 
 **監視対象フォルダ**: Google Driveの`My Drive/audio`フォルダ（Phase 5-2と同じ）
 
-#### タスク
-- [ ] requirements.txt更新
-  - [ ] fastapi追加
-  - [ ] uvicorn[standard]追加
-- [ ] webhook_server.py実装（FastAPI）（~120行）
-  - [ ] Webhookエンドポイント作成（POST /webhook）
-  - [ ] Google Drive認証
-  - [ ] changes.watch() 実装
-  - [ ] 24時間ごとに自動webhook更新
-  - [ ] Webhook受信 → changes.list() → 新規ファイルダウンロード → 文字起こし
-- [ ] ngrokセットアップ（ローカルHTTPS トンネル）
-  - [ ] ngrokインストール
-  - [ ] HTTPS URL取得
-- [ ] Google Drive Push通知設定
-  - [ ] ngrok HTTPS URLをchanges.watch()に登録
-- [ ] 動作テスト
-  - [ ] ngrokでローカルHTTPSテスト
-  - [ ] Webhook受信テスト
-  - [ ] リアルタイム文字起こしテスト
+#### 完了タスク
+- [x] requirements.txt更新
+  - [x] fastapi追加
+  - [x] uvicorn[standard]追加
+- [x] webhook_server.py実装（280行）
+  - [x] Webhookエンドポイント作成（POST /webhook）
+  - [x] Google Drive認証
+  - [x] changes.watch() 実装
+  - [x] /setup エンドポイントでWebhook登録
+  - [x] Webhook受信 → バックグラウンド処理 → 新規ファイルダウンロード → 文字起こし
+- [x] ngrokセットアップ（ローカルHTTPS トンネル）
+  - [x] ngrokインストール
+  - [x] ngrok authtoken設定
+  - [x] HTTPS URL取得
+- [x] Google Drive Push通知設定
+  - [x] ngrok HTTPS URLをchanges.watch()に登録
+  - [x] 初回同期メッセージ受信確認
+- [x] 動作テスト
+  - [x] ngrokでローカルHTTPSテスト
+  - [x] Webhook受信テスト（State: change）
+  - [x] リアルタイム文字起こしテスト
 
 **検知方式**: イベント駆動（数秒以内にリアルタイム検知）
 
@@ -134,15 +144,25 @@
 **本番環境**: 不要（ローカルテストのみ）
 
 **使い方**:
-1. `uvicorn webhook_server:app --port 8000`
-2. 別ターミナルで`ngrok http 8000`
-3. ngrok HTTPS URLをGoogle Drive webhookに登録
+1. FastAPI起動: `PYTHONPATH="venv/lib/python3.11/site-packages:$PYTHONPATH" /usr/local/opt/python@3.11/bin/python3.11 webhook_server.py`
+2. 別ターミナルでngrok起動: `ngrok http 8000`
+3. Webhook登録: `curl "http://localhost:8000/setup?webhook_url=<ngrok-https-url>"`
 
 **注意事項**:
 - ngrok無料版は2時間セッション制限
 - URL再起動ごとに変更（webhook再登録必要）
+- Webhook有効期限: 24時間（自動更新未実装）
 
-**完了条件**: ファイルアップロード後、数秒以内に自動文字起こし開始（ngrok環境で動作）
+**完了条件**: ✅ ファイルアップロード後、数秒以内に自動文字起こし開始（ngrok環境で動作）
+
+**完了日**: 2025-10-11
+
+**テスト実績**:
+- Seven Eleven Soka Kitaya 1Chome-Shop 12.m4a (89KB)
+- Webhook通知受信（State: change）
+- 検知から処理完了まで: 数秒以内
+- ngrok URL: https://6ca1c21ca080.ngrok-free.app
+- Channel ID: channel-20251011031555
 
 ## 完了タスク
 
@@ -182,9 +202,9 @@
 ### 開発進捗
 - **Phase 3**: ✅ 100% 完了
 - **Phase 4**: ✅ 100% 完了
-- **Phase 5-1**: 🔄 0% (実装開始予定)
-- **Phase 5-2**: ⬜ 0% (未開始)
-- **Phase 5-3**: ⬜ 0% (未開始)
+- **Phase 5-1**: ✅ 100% 完了
+- **Phase 5-2**: ✅ 100% 完了
+- **Phase 5-3**: ✅ 100% 完了
 
 ### コード統計（Phase 3目標）
 - **実装総行数**: 50行（transcribe_api.py）
@@ -240,6 +260,8 @@
 
 ## 更新履歴
 
+- **2025-10-11 12:20**: Phase 5-3完了（FastAPI + Push通知リアルタイム検知）
+- **2025-10-11 11:30**: Phase 5-2完了（ポーリング自動検知、大容量ファイル対応）
 - **2025-10-09 13:00**: Phase 5-1完了、テスト成功（各Phase完了ごとにコミット方針）
 - **2025-10-09 12:30**: Phase 5をGoogle Drive連携（3段階）に変更、メモリーバンク更新完了
 - **2025-10-09 11:45**: Phase 6破棄、コミット27795dcに戻す
