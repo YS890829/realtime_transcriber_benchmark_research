@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 """
-超シンプル文字起こし＆要約スクリプト（Phase 4）
+超シンプル文字起こし＆要約スクリプト（Phase 7 Stage 7-1）
 使い方: python transcribe_api.py <音声ファイルパス>
-機能: OpenAI Whisper API文字起こし + Gemini API要約
+機能: Gemini Audio API文字起こし（話者識別付き） + Gemini API要約
 """
 
 import os
 import sys
 import subprocess
 from pathlib import Path
-from openai import OpenAI
 from dotenv import load_dotenv
 import google.generativeai as genai
 
 # .envファイルを読み込み
 load_dotenv()
 
-# OpenAI Whisper API file size limit (25MB)
-MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB in bytes
+# Gemini API inline file size limit (20MB)
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
 
 
 def split_audio_file(file_path, chunk_duration=600):
@@ -59,22 +58,24 @@ def split_audio_file(file_path, chunk_duration=600):
 
 def transcribe_audio(file_path):
     """
-    OpenAI Whisper APIで音声ファイルを文字起こし（大容量ファイル対応）
+    Gemini Audio APIで音声ファイルを文字起こし（話者識別付き、大容量ファイル対応）
 
     引数:
         file_path: 音声ファイルのパス（.m4a, .mp3, .wav等）
 
     戻り値:
-        文字起こしされたテキスト（文字列）
+        タプル: (文字起こしテキスト, 話者情報リスト)
     """
-    # OpenAIクライアント初期化
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
     file_size = os.path.getsize(file_path)
+    file_path_obj = Path(file_path)
+    mime_type = f"audio/{file_path_obj.suffix[1:]}" if file_path_obj.suffix else "audio/mpeg"
 
-    # ファイルサイズチェック（25MB超過の場合は分割）
+    # ファイルサイズチェック（20MB超過の場合は分割）
     if file_size > MAX_FILE_SIZE:
-        print(f"  File size: {file_size / 1024 / 1024:.1f}MB (exceeds 25MB limit)")
+        print(f"  File size: {file_size / 1024 / 1024:.1f}MB (exceeds 20MB limit)")
         print(f"  Splitting into chunks...")
 
         chunks = split_audio_file(file_path)
@@ -82,17 +83,36 @@ def transcribe_audio(file_path):
 
         # 各チャンクを文字起こし
         transcriptions = []
+        all_speakers = {}
+
         for i, chunk_path in enumerate(chunks, 1):
             print(f"  Transcribing chunk {i}/{len(chunks)}...", end='\r')
 
             with open(chunk_path, "rb") as audio_file:
-                response = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    language="ja"
-                )
+                audio_bytes = audio_file.read()
+
+            prompt = """この音声ファイルを文字起こししてください。
+話者を識別し、以下の形式で出力してください：
+
+[Speaker 1] 発言内容
+[Speaker 2] 発言内容
+
+日本語で文字起こしをお願いします。"""
+
+            response = model.generate_content(
+                [prompt, {"mime_type": mime_type, "data": audio_bytes}]
+            )
 
             transcriptions.append(response.text)
+
+            # 話者カウント（簡易版）
+            text = response.text
+            for line in text.split('\n'):
+                if '[Speaker' in line:
+                    speaker = line.split(']')[0].replace('[', '').strip()
+                    if speaker not in all_speakers:
+                        all_speakers[speaker] = 0
+                    all_speakers[speaker] += 1
 
         print()  # 改行
 
@@ -102,19 +122,37 @@ def transcribe_audio(file_path):
         chunks[0].parent.rmdir()
 
         # 文字起こし結果を結合
-        return "\n\n".join(transcriptions)
+        full_text = "\n\n".join(transcriptions)
+        speakers = list(all_speakers.keys())
+
+        return full_text, speakers
 
     else:
-        # ファイルサイズが25MB以下の場合は通常処理
+        # ファイルサイズが20MB以下の場合は通常処理
         with open(file_path, "rb") as audio_file:
-            # Whisper APIで文字起こし
-            response = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                language="ja"  # 日本語指定
-            )
+            audio_bytes = audio_file.read()
 
-        return response.text
+        prompt = """この音声ファイルを文字起こししてください。
+話者を識別し、以下の形式で出力してください：
+
+[Speaker 1] 発言内容
+[Speaker 2] 発言内容
+
+日本語で文字起こしをお願いします。"""
+
+        response = model.generate_content(
+            [prompt, {"mime_type": mime_type, "data": audio_bytes}]
+        )
+
+        # 話者抽出（簡易版）
+        speakers = []
+        for line in response.text.split('\n'):
+            if '[Speaker' in line:
+                speaker = line.split(']')[0].replace('[', '').strip()
+                if speaker not in speakers:
+                    speakers.append(speaker)
+
+        return response.text, speakers
 
 def summarize_text(text):
     """
@@ -128,7 +166,7 @@ def summarize_text(text):
     """
     # Gemini API初期化
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
     # 要約プロンプト
     prompt = f"""以下の文字起こしテキストを要約してください。
@@ -200,8 +238,14 @@ def main():
 
     print(f"🎙️ 文字起こし開始: {audio_path}")
 
-    # 文字起こし実行
-    text = transcribe_audio(audio_path)
+    # 文字起こし実行（Gemini Audio API + 話者識別）
+    text, speakers = transcribe_audio(audio_path)
+
+    # 話者情報表示
+    if speakers:
+        print(f"📢 検出された話者: {len(speakers)}名")
+        for speaker in speakers:
+            print(f"  - {speaker}")
 
     # 出力ファイル名を生成
     base_path = audio_path.rsplit(".", 1)[0]
