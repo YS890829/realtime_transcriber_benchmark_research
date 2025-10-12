@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phase 6-3 Stage 1: Semantic Search Tool
+Phase 7 Stage 7-2: Semantic Search Tool (Gemini Embeddings)
 ChromaDBに保存されたベクトルインデックスを使用してセマンティック検索を実行
 
 機能:
@@ -15,16 +15,16 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
-from langchain_openai import OpenAIEmbeddings
+import google.generativeai as genai
 import chromadb
 from chromadb.config import Settings
 
 # 環境変数の読み込み
 load_dotenv()
 
-# OpenAI API キー確認
-if not os.getenv("OPENAI_API_KEY"):
-    print("❌ Error: OPENAI_API_KEY not found in environment variables")
+# Gemini API キー確認
+if not os.getenv("GEMINI_API_KEY"):
+    print("❌ Error: GEMINI_API_KEY not found in environment variables")
     sys.exit(1)
 
 
@@ -50,14 +50,12 @@ class SemanticSearchEngine:
             )
         )
 
-        # OpenAI Embeddings 初期化
-        self.embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small",
-            openai_api_key=os.getenv("OPENAI_API_KEY")
-        )
+        # Gemini API 初期化
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
         print(f"✅ Semantic Search Engine initialized")
         print(f"   ChromaDB path: {self.chroma_path}")
+        print(f"   Using Gemini Embeddings: text-embedding-004")
 
     def list_collections(self) -> List[str]:
         """利用可能なコレクション一覧を取得"""
@@ -95,8 +93,13 @@ class SemanticSearchEngine:
             print(f"   Available collections: {', '.join(self.list_collections())}")
             return {"results": []}
 
-        # クエリをベクトル化
-        query_embedding = self.embeddings.embed_query(query)
+        # クエリをベクトル化（Gemini Embeddings API）
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=query,
+            task_type="retrieval_query"
+        )
+        query_embedding = result['embedding']
 
         # 検索実行
         search_kwargs = {
@@ -159,9 +162,19 @@ class SemanticSearchEngine:
 
             # メタデータ表示
             meta = result['metadata']
-            print(f"\n⏱️  Time: {meta.get('start_time', 'N/A'):.2f}s - {meta.get('end_time', 'N/A'):.2f}s")
-            print(f"   Duration: {meta.get('duration', 0):.2f}s")
+
+            # タイムスタンプ表示（start_time/end_timeがあればそれを、なければtimestampを表示）
+            if meta.get('start_time') is not None:
+                print(f"\n⏱️  Time: {meta.get('start_time'):.2f}s - {meta.get('end_time'):.2f}s")
+                print(f"   Duration: {meta.get('duration', 0):.2f}s")
+            elif meta.get('timestamp'):
+                print(f"\n⏱️  Timestamp: {meta.get('timestamp')}")
+
             print(f"   Segment ID: {meta.get('segment_id', 'N/A')}")
+
+            # 話者情報があれば表示
+            if meta.get('speaker'):
+                print(f"   Speaker: {meta.get('speaker')}")
 
             if meta.get('topics'):
                 print(f"\n🏷️  Segment Topics: {meta['topics']}")

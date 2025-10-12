@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phase 6-3 Stage 2: RAG Q&A System
+Phase 7 Stage 7-2: RAG Q&A System (Gemini Embeddings)
 ChromaDBとGemini APIを使用したRAG (Retrieval Augmented Generation) Q&Aシステム
 
 機能:
@@ -15,7 +15,6 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
-from langchain_openai import OpenAIEmbeddings
 import chromadb
 from chromadb.config import Settings
 import google.generativeai as genai
@@ -23,11 +22,7 @@ import google.generativeai as genai
 # 環境変数の読み込み
 load_dotenv()
 
-# API キー確認
-if not os.getenv("OPENAI_API_KEY"):
-    print("❌ Error: OPENAI_API_KEY not found in environment variables")
-    sys.exit(1)
-
+# Gemini API キー確認
 if not os.getenv("GEMINI_API_KEY"):
     print("❌ Error: GEMINI_API_KEY not found in environment variables")
     sys.exit(1)
@@ -55,19 +50,14 @@ class RAGQASystem:
             )
         )
 
-        # OpenAI Embeddings 初期化
-        self.embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small",
-            openai_api_key=os.getenv("OPENAI_API_KEY")
-        )
-
         # Gemini API 初期化
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.llm = genai.GenerativeModel("gemini-2.0-flash-exp")
+        self.llm = genai.GenerativeModel("gemini-2.5-pro")
 
         print(f"✅ RAG Q&A System initialized")
         print(f"   ChromaDB: {self.chroma_path}")
-        print(f"   LLM: gemini-2.0-flash-exp")
+        print(f"   Embeddings: text-embedding-004 (Gemini)")
+        print(f"   LLM: gemini-2.5-pro")
 
     def retrieve_context(
         self,
@@ -90,8 +80,13 @@ class RAGQASystem:
 
         collection = self.client.get_collection(name=collection_name)
 
-        # クエリをベクトル化して検索
-        query_embedding = self.embeddings.embed_query(query)
+        # クエリをベクトル化して検索（Gemini Embeddings API）
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=query,
+            task_type="retrieval_query"
+        )
+        query_embedding = result['embedding']
 
         results = collection.query(
             query_embeddings=[query_embedding],
@@ -137,12 +132,28 @@ class RAGQASystem:
         print(f"\n🤖 Generating answer with Gemini...")
 
         # コンテキストテキストを構築
-        context_text = "\n\n---\n\n".join([
-            f"[セグメント {i+1}] (開始時刻: {ctx['metadata'].get('start_time', 'N/A'):.2f}秒)\n"
-            f"トピック: {ctx['metadata'].get('topics', '不明')}\n"
-            f"内容: {ctx['text']}"
-            for i, ctx in enumerate(contexts)
-        ])
+        context_parts = []
+        for i, ctx in enumerate(contexts):
+            meta = ctx['metadata']
+            # タイムスタンプ表示（start_timeがあればそれを、なければtimestampを使用）
+            if meta.get('start_time') is not None:
+                time_info = f"開始時刻: {meta.get('start_time'):.2f}秒"
+            elif meta.get('timestamp'):
+                time_info = f"タイムスタンプ: {meta.get('timestamp')}"
+            else:
+                time_info = "時刻: 不明"
+
+            # 話者情報があれば追加
+            speaker_info = f", 話者: {meta.get('speaker')}" if meta.get('speaker') else ""
+
+            part = (
+                f"[セグメント {i+1}] ({time_info}{speaker_info})\n"
+                f"トピック: {meta.get('topics', '不明')}\n"
+                f"内容: {ctx['text']}"
+            )
+            context_parts.append(part)
+
+        context_text = "\n\n---\n\n".join(context_parts)
 
         # Gemini APIへのプロンプト
         prompt = f"""以下の文字起こしデータを参照して、ユーザーの質問に答えてください。
