@@ -19,6 +19,19 @@ import google.generativeai as genai
 # .envファイルを読み込み
 load_dotenv()
 
+# Gemini API Key選択（デフォルト: 無料枠）
+USE_PAID_TIER = os.getenv("USE_PAID_TIER", "false").lower() == "true"
+if USE_PAID_TIER:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_PAID")
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY_PAID not set but USE_PAID_TIER=true")
+    print("ℹ️  Using PAID tier API key")
+else:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_FREE")
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY_FREE not set")
+    print("ℹ️  Using FREE tier API key")
+
 # Gemini API inline file size limit (20MB)
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
 
@@ -63,8 +76,8 @@ def transcribe_audio_with_gemini(file_path):
             "speakers": [話者リスト]
         }
     """
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    # Use Gemini 2.5 Flash (paid tier for higher rate limits)
+    genai.configure(api_key=GEMINI_API_KEY)
+    # Use Gemini 2.5 Flash
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     file_size = os.path.getsize(file_path)
@@ -338,8 +351,8 @@ def summarize_text(text):
     """
     Gemini APIでテキストを要約
     """
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    # Use Gemini 2.5 Flash (paid tier for higher rate limits)
+    genai.configure(api_key=GEMINI_API_KEY)
+    # Use Gemini 2.5 Flash
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     prompt = f"""以下の文字起こしテキストを要約してください。

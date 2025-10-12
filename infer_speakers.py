@@ -15,10 +15,18 @@ from dotenv import load_dotenv
 # .envファイルを読み込み
 load_dotenv()
 
-# Gemini API設定
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable not set")
+# Gemini API Key選択（デフォルト: 無料枠）
+USE_PAID_TIER = os.getenv("USE_PAID_TIER", "false").lower() == "true"
+if USE_PAID_TIER:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_PAID")
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY_PAID not set but USE_PAID_TIER=true")
+    print("ℹ️  Using PAID tier API key")
+else:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_FREE")
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY_FREE not set")
+    print("ℹ️  Using FREE tier API key")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
