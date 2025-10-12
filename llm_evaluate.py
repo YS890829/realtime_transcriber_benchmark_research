@@ -23,8 +23,8 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 無料プランで使用可能な高速モデル
-MODEL_NAME = 'gemini-2.0-flash-exp'
+# 有料プラン: Gemini 2.5 Pro（無料プランのクォータ到達のため）
+MODEL_NAME = 'gemini-2.5-pro'
 
 def llm_compare_summaries(original_segments, baseline_summary, new_pipeline_summary):
     """

@@ -25,8 +25,8 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 無料プランで使用可能な高速モデル
-MODEL_NAME = 'gemini-2.0-flash-exp'
+# 有料プラン: Gemini 2.5 Pro（無料プランのクォータ到達のため）
+MODEL_NAME = 'gemini-2.5-pro'
 
 def summarize_segments_baseline(segments, window_size=10):
     """
@@ -68,8 +68,8 @@ def summarize_segments_baseline(segments, window_size=10):
 
         print(f"   Summarized segments {window[0]['id']}-{window[-1]['id']} ({len(window)} segments)")
 
-        # Rate limit対策: 6秒待機（10 req/min）
-        time.sleep(6)
+        # Rate limit対策: Gemini 2.5 Proは2 req/min (30秒待機)
+        time.sleep(30)
 
     return summarized
 
