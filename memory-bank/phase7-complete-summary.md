@@ -178,16 +178,28 @@
 ### 残タスク
 
 **次に実施すべき項目:**
-1. **残り4ファイルのトピック・エンティティ抽出**
-   - `add_topics_entities.py`を実行（各ファイル10-15分）
-   - 推定時間: 40-60分
 
-2. **残り4ファイルのベクトルインデックス構築**
-   - `build_vector_index.py`を実行（各ファイル10-20分）
-   - 推定時間: 40-80分
+**注意:** 音声ファイルの文字起こしは既に完了しています。以下は既存の`_structured.json`に対する後処理です。
+
+1. **残り4つの`_structured.json`に対してトピック・エンティティ抽出**
+   - 入力: `*_structured.json`（Gemini文字起こし済み）
+   - 出力: `*_structured_enhanced.json`
+   - コマンド例: `venv/bin/python3 add_topics_entities.py "downloads/Test Recording_structured.json"`
+   - 処理内容: Gemini 2.5 Proでトピック・エンティティ・要約を抽出
+   - 推定時間: 各10-15分、合計40-60分
+
+2. **残り4つの`_structured_enhanced.json`に対してベクトルインデックス構築**
+   - 入力: `*_structured_enhanced.json`
+   - 出力: ChromaDBコレクション
+   - コマンド例: `venv/bin/python3 build_vector_index.py "downloads/Test Recording_structured_enhanced.json"`
+   - 処理内容: Gemini Embeddingsでベクトル化、ChromaDBに保存
+   - 推定時間: 各10-20分、合計40-80分
 
 3. **5ファイル統合のクロスミーティング分析**
-   - `cross_analysis.py`を実行（全ファイル処理）
+   - 入力: 5つの`*_structured_enhanced.json`
+   - 出力: クロスミーティング分析レポート
+   - コマンド例: `venv/bin/python3 cross_analysis.py downloads/*_structured_enhanced.json`
+   - 処理内容: 全ミーティング横断でトピック・エンティティ・アクションアイテムを分析
    - 推定時間: 10-15分
 
 **合計推定時間:** 1.5-2.5時間
