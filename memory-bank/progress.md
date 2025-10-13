@@ -468,6 +468,7 @@
 - ✅ README.md更新: ファイル構成を元に戻す（Phase 7検証スクリプトをルートに配置）
 - ✅ memory-bank/progress.md更新: 撤回記録と復元理由を追加
 - ✅ コミット 3f70098: 「Revert validation scripts to project root」
+- ✅ コミット e5c04d2: 「Update memory-bank: Document validation script revert completion」
 
 **復元理由:**
 Phase 7検証スクリプトはプロジェクトのコア機能として重要。プロジェクトルートに配置することで、検証スクリプトへのアクセスが容易になる。
@@ -477,6 +478,29 @@ Phase 7検証スクリプトはプロジェクトのコア機能として重要�
 - validation/フォルダ削除完了
 - ドキュメント更新完了
 - コミット 3eacf18の変更を正常に撤回
+
+### 2025-10-13（Phase 1: Vector DB & RAGシステム復元）
+- ✅ `build_vector_index.py`復元（commit 18a82b3ベース）
+  - OpenAI Embeddings → Gemini text-embedding-004に置き換え
+  - FREE/PAID tier APIキー選択ロジック追加
+- ✅ `semantic_search.py`復元（commit 35f4da4ベース）
+  - OpenAI Embeddings → Gemini text-embedding-004に置き換え
+  - FREE/PAID tier APIキー選択ロジック追加
+- ✅ `rag_qa.py`復元（commit eacdb29ベース）
+  - OpenAI Embeddings削除、Gemini text-embedding-004に統一
+  - Gemini LLM (gemini-2.0-flash-exp) 維持
+  - FREE/PAID tier APIキー選択ロジック追加
+- ⏳ コミット予定: 「Restore Phase 1: Vector DB & RAG system (3 files)」
+
+**復元内容:**
+- Vector DBインデックス構築機能（ChromaDB + Gemini embeddings）
+- セマンティック検索機能（コレクション横断検索、メタデータフィルター）
+- RAG Q&Aシステム（コンテキスト検索 + 回答生成）
+
+**Gemini API統一:**
+- Phase 7の成果を維持（OpenAI API完全撤廃）
+- 全ファイルでGemini text-embedding-004使用
+- FREE/PAID tier切り替え対応
 
 ### 2025-10-13（ドキュメント再編成）
 - ✅ `docs/`フォルダ作成: 技術ドキュメント格納
