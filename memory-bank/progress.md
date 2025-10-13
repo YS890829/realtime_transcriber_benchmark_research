@@ -443,7 +443,7 @@
 
 ## 更新履歴
 
-### 2025-10-13（プロジェクト直下ファイル整理）
+### 2025-10-13（プロジェクト直下ファイル整理）【撤回済み】
 - ✅ セキュリティファイル削除: `credentials.json`, `token.json`（OAuth認証情報、再生成可能）
 - ✅ ログファイル削除: `monitor.log`, `monitor_error.log`（一時ファイル）
 - ✅ `validation/`フォルダ作成: Phase 7検証スクリプト格納用
@@ -452,12 +452,24 @@
   - `evaluate_accuracy.py` → `validation/evaluate_accuracy.py`
   - `create_small_sample.py` → `validation/create_small_sample.py`
 - ✅ README.md更新: ファイル構成に`validation/`フォルダ追加
-- ✅ コミット: リポジトリ整理完了
+- ✅ コミット 3eacf18: リポジトリ整理完了
 
 **整理結果:**
 - 削除: 4ファイル（セキュリティ2、ログ2）
 - 移動: 3ファイル（検証スクリプト → validation/）
 - 現在のプロジェクト直下: 11コアファイルのみ（実装7 + テスト1 + 設定3）
+
+### 2025-10-13（整理撤回: 検証スクリプトをルートに復元）
+- ✅ 検証スクリプト復元（3ファイル）:
+  - `validation/run_validation.py` → `run_validation.py`
+  - `validation/evaluate_accuracy.py` → `evaluate_accuracy.py`
+  - `validation/create_small_sample.py` → `create_small_sample.py`
+- ✅ `validation/`フォルダ削除
+- ✅ README.md更新: ファイル構成を元に戻す（Phase 7検証スクリプトをルートに配置）
+- ⏳ コミット予定: 「Revert validation scripts to project root」
+
+**復元理由:**
+Phase 7検証スクリプトはプロジェクトのコア機能として重要。プロジェクトルートに配置することで、検証スクリプトへのアクセスが容易になる。
 
 ### 2025-10-13（ドキュメント再編成）
 - ✅ `docs/`フォルダ作成: 技術ドキュメント格納
@@ -502,7 +514,8 @@ Phase 7完了、リポジトリ整理完了。次のフェーズは未定。
 
 ## 更新履歴
 
-- **2025-10-13**: プロジェクト直下ファイル整理完了（validation/フォルダ作成、セキュリティファイル削除、検証スクリプト移動）
+- **2025-10-13**: 検証スクリプト復元（validation/→ルート）、README.md・progress.md更新
+- **2025-10-13**: プロジェクト直下ファイル整理完了（validation/フォルダ作成、セキュリティファイル削除、検証スクリプト移動）【撤回済み】
 - **2025-10-13**: ドキュメント整理完了（docs/フォルダ作成、8ファイル削除、3ファイル統合）
 - **2025-10-13**: Gemini API無料枠・有料枠切り替え機能実装、progress.mdにPhase 7サマリー統合
 - **2025-10-12**: Phase 7完了（OpenAI API完全撤廃、Gemini API完全移行、年間コスト$0達成）

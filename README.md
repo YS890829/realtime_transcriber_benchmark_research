@@ -200,10 +200,9 @@ cat .env
 │   ├── projectbrief.md            # プロジェクト概要
 │   ├── progress.md                # 全フェーズ進捗管理
 │   └── gemini-api-tier-management.md  # API切り替え管理
-├── validation/                    # Phase 7検証スクリプト（アーカイブ）
-│   ├── run_validation.py          # 統合検証スクリプト
-│   ├── evaluate_accuracy.py       # 精度評価スクリプト
-│   └── create_small_sample.py     # サンプル作成スクリプト
+├── run_validation.py              # Phase 7統合検証スクリプト
+├── evaluate_accuracy.py           # Phase 7精度評価スクリプト
+├── create_small_sample.py         # Phase 7サンプル作成スクリプト
 └── archive_phase1_local_whisper/  # 旧実装アーカイブ
 ```
 
