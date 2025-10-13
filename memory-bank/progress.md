@@ -466,10 +466,17 @@
   - `validation/create_small_sample.py` → `create_small_sample.py`
 - ✅ `validation/`フォルダ削除
 - ✅ README.md更新: ファイル構成を元に戻す（Phase 7検証スクリプトをルートに配置）
-- ⏳ コミット予定: 「Revert validation scripts to project root」
+- ✅ memory-bank/progress.md更新: 撤回記録と復元理由を追加
+- ✅ コミット 3f70098: 「Revert validation scripts to project root」
 
 **復元理由:**
 Phase 7検証スクリプトはプロジェクトのコア機能として重要。プロジェクトルートに配置することで、検証スクリプトへのアクセスが容易になる。
+
+**復元完了:**
+- 3ファイル正常に復元（git renameとして記録）
+- validation/フォルダ削除完了
+- ドキュメント更新完了
+- コミット 3eacf18の変更を正常に撤回
 
 ### 2025-10-13（ドキュメント再編成）
 - ✅ `docs/`フォルダ作成: 技術ドキュメント格納
