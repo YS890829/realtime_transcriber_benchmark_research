@@ -441,20 +441,68 @@
 2. **5-2（ポーリング）**: 定期的な調査で自動化を学ぶ
 3. **5-3（Push通知）**: Webhook・FastAPI・リアルタイム処理を学ぶ
 
+## 更新履歴
+
+### 2025-10-13（プロジェクト直下ファイル整理）
+- ✅ セキュリティファイル削除: `credentials.json`, `token.json`（OAuth認証情報、再生成可能）
+- ✅ ログファイル削除: `monitor.log`, `monitor_error.log`（一時ファイル）
+- ✅ `validation/`フォルダ作成: Phase 7検証スクリプト格納用
+- ✅ 検証スクリプト移動（3ファイル）:
+  - `run_validation.py` → `validation/run_validation.py`
+  - `evaluate_accuracy.py` → `validation/evaluate_accuracy.py`
+  - `create_small_sample.py` → `validation/create_small_sample.py`
+- ✅ README.md更新: ファイル構成に`validation/`フォルダ追加
+- ✅ コミット: リポジトリ整理完了
+
+**整理結果:**
+- 削除: 4ファイル（セキュリティ2、ログ2）
+- 移動: 3ファイル（検証スクリプト → validation/）
+- 現在のプロジェクト直下: 11コアファイルのみ（実装7 + テスト1 + 設定3）
+
+### 2025-10-13（ドキュメント再編成）
+- ✅ `docs/`フォルダ作成: 技術ドキュメント格納
+- ✅ ドキュメント移動（3ファイル）:
+  - `PIPELINE_README.md` → `docs/pipeline-architecture.md`
+  - `VALIDATION_PROGRESS_REPORT.md` → `docs/validation-history.md`
+  - `FINAL_EVALUATION_REPORT.md` → `docs/validation-results.md`
+- ✅ 廃止ファイル削除（8ファイル）:
+  - `.channel_info.json`, `cleanup_plan.md`, `MEMORY_BANK_UPDATE.md`, `VALIDATION_PLAN.md`
+  - `monitor.log`, `monitor_error.log`
+- ✅ README.md更新: ドキュメント構成説明追加
+- ✅ コミット 9ac949a: ドキュメント再編成完了
+
+### 2025-10-13（Phase 7要約統合）
+- ✅ `phase7-complete-summary.md`の内容を`progress.md`に統合
+- ✅ Phase 7完了セクション追加（3ステージ、技術スタック、処理結果）
+- ✅ `phase7-complete-summary.md`削除
+- ✅ コミット 7daf83c: Phase 7要約統合完了
+
+### 2025-10-13（Gemini API tier管理実装）
+- ✅ `.env`更新: 無料枠・有料枠APIキー分離、`USE_PAID_TIER`フラグ追加
+- ✅ `.env.example`更新: APIキー切り替え手順ドキュメント化
+- ✅ 7つのPythonファイルにAPIキー選択ロジック追加:
+  - `structured_transcribe.py`, `infer_speakers.py`, `summarize_with_context.py`
+  - `generate_optimal_filename.py`, `llm_evaluate.py`, `baseline_pipeline.py`
+  - `test_gemini_tier.py`（新規作成）
+- ✅ `memory-bank/gemini-api-tier-management.md`作成: 完全なドキュメント
+- ✅ コミット c7e2c5b: Gemini API tier管理実装完了
+
+**デフォルト設定:**
+- 無料枠を使用（`USE_PAID_TIER`コメントアウト）
+- 有料枠使用時: `.env`内の1行コメント解除のみ
+
+**テスト結果:**
+- 無料枠: 5 RPM制限検出 ✅
+- 有料枠: 6/6リクエスト成功（8秒） ✅
+
 ## 次のアクション
 
-### 最優先（Phase 5-1実装）
-1. **Google Cloud Console設定**: API有効化、OAuth認証設定
-2. **requirements.txt更新**: Google Drive API関連ライブラリ追加
-3. **drive_download.py実装**: 手動ダウンロード＆文字起こし
-4. **動作テスト**: Google Drive認証、ファイルダウンロード、文字起こしテスト
-
-### Phase 5-1完了後
-1. **Phase 5-2実装**: ポーリング自動検知
-2. **Phase 5-3実装**: FastAPI + Push通知
+### 現在のステータス
+Phase 7完了、リポジトリ整理完了。次のフェーズは未定。
 
 ## 更新履歴
 
+- **2025-10-13**: プロジェクト直下ファイル整理完了（validation/フォルダ作成、セキュリティファイル削除、検証スクリプト移動）
 - **2025-10-13**: ドキュメント整理完了（docs/フォルダ作成、8ファイル削除、3ファイル統合）
 - **2025-10-13**: Gemini API無料枠・有料枠切り替え機能実装、progress.mdにPhase 7サマリー統合
 - **2025-10-12**: Phase 7完了（OpenAI API完全撤廃、Gemini API完全移行、年間コスト$0達成）

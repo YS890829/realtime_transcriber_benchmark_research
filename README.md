@@ -190,11 +190,8 @@ cat .env
 ├── generate_optimal_filename.py   # 最適ファイル名生成
 ├── run_full_pipeline.py           # 統合パイプライン
 ├── baseline_pipeline.py           # ベースラインパイプライン
-├── evaluate_accuracy.py           # 自動評価
-├── llm_evaluate.py               # LLM評価
-├── run_validation.py             # 統合検証
-├── create_small_sample.py        # サンプル作成
-├── test_gemini_tier.py           # API Tierテスト
+├── llm_evaluate.py                # LLM評価
+├── test_gemini_tier.py            # API Tierテスト
 ├── docs/                          # 技術ドキュメント
 │   ├── pipeline-architecture.md   # パイプライン技術仕様
 │   ├── validation-history.md      # 検証プロセス履歴
@@ -203,6 +200,10 @@ cat .env
 │   ├── projectbrief.md            # プロジェクト概要
 │   ├── progress.md                # 全フェーズ進捗管理
 │   └── gemini-api-tier-management.md  # API切り替え管理
+├── validation/                    # Phase 7検証スクリプト（アーカイブ）
+│   ├── run_validation.py          # 統合検証スクリプト
+│   ├── evaluate_accuracy.py       # 精度評価スクリプト
+│   └── create_small_sample.py     # サンプル作成スクリプト
 └── archive_phase1_local_whisper/  # 旧実装アーカイブ
 ```
 
