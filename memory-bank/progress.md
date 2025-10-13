@@ -502,6 +502,30 @@ Phase 7検証スクリプトはプロジェクトのコア機能として重要�
 - 全ファイルでGemini text-embedding-004使用
 - FREE/PAID tier切り替え対応
 
+### 2025-10-13（Phase 2: データ分析機能復元）
+- ✅ `add_topics_entities.py`復元（commit 3eed4ccベース）
+  - FREE/PAID tier APIキー選択ロジック追加
+- ✅ `topic_clustering_llm.py`復元（commit 3eed4ccベース）
+  - FREE/PAID tier APIキー選択ロジック追加
+- ✅ `entity_resolution_llm.py`復元（commit 3eed4ccベース）
+  - FREE/PAID tier APIキー選択ロジック追加
+- ✅ `action_item_structuring.py`復元（commit 3eed4ccベース）
+  - FREE/PAID tier APIキー選択ロジック追加
+- ✅ `cross_analysis.py`復元（commit 63dadf4ベース）
+  - FREE/PAID tier APIキー選択ロジック追加
+- ⏳ コミット予定: 「Restore Phase 2: Data analysis features (5 files)」
+
+**復元内容:**
+- トピック・エンティティ抽出機能
+- トピッククラスタリング（LLMベース）
+- エンティティ名寄せ（同一人物・組織の統合）
+- アクションアイテム構造化（2段階抽出）
+- クロスミーティング分析（複数ファイル横断）
+
+**Gemini API統一:**
+- 全ファイルで既にGemini 2.0 Flash使用
+- FREE/PAID tier切り替え対応追加
+
 ### 2025-10-13（ドキュメント再編成）
 - ✅ `docs/`フォルダ作成: 技術ドキュメント格納
 - ✅ ドキュメント移動（3ファイル）:
