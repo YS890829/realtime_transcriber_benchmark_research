@@ -181,18 +181,29 @@ cat .env
 
 ```
 .
-├── transcribe.py          # メインスクリプト（310行）
-├── requirements.txt       # 依存関係（3つ）
-├── .env.example          # 環境変数テンプレート
-├── .gitignore            # Git除外設定
-├── README.md             # このファイル
-└── memory-bank/          # 開発メモリーバンク
-    ├── projectbrief.md
-    ├── systemPatterns.md
-    ├── techContext.md
-    ├── activeContext.md
-    ├── progress.md
-    └── productContext.md
+├── README.md                      # プロジェクト概要
+├── requirements.txt               # 依存関係
+├── .env.example                   # 環境変数テンプレート
+├── structured_transcribe.py       # 音声文字起こし（Gemini Audio API）
+├── infer_speakers.py              # 話者推論
+├── summarize_with_context.py      # コンテキスト付き要約
+├── generate_optimal_filename.py   # 最適ファイル名生成
+├── run_full_pipeline.py           # 統合パイプライン
+├── baseline_pipeline.py           # ベースラインパイプライン
+├── evaluate_accuracy.py           # 自動評価
+├── llm_evaluate.py               # LLM評価
+├── run_validation.py             # 統合検証
+├── create_small_sample.py        # サンプル作成
+├── test_gemini_tier.py           # API Tierテスト
+├── docs/                          # 技術ドキュメント
+│   ├── pipeline-architecture.md   # パイプライン技術仕様
+│   ├── validation-history.md      # 検証プロセス履歴
+│   └── validation-results.md      # 話者識別精度実績
+├── memory-bank/                   # プロジェクト進捗記録
+│   ├── projectbrief.md            # プロジェクト概要
+│   ├── progress.md                # 全フェーズ進捗管理
+│   └── gemini-api-tier-management.md  # API切り替え管理
+└── archive_phase1_local_whisper/  # 旧実装アーカイブ
 ```
 
 ## Unstructured.ioベンチマーク
@@ -224,16 +235,17 @@ MIT License
 
 ## 開発者向け
 
-### メモリーバンク
+### ドキュメント構成
 
-`memory-bank/`ディレクトリに開発計画と技術仕様を記録しています。
+#### 技術ドキュメント (`docs/`)
+- `pipeline-architecture.md`: 統合パイプライン（話者推論→要約→ファイル名生成）の技術仕様
+- `validation-history.md`: 精度改善検証プロセスの履歴
+- `validation-results.md`: 話者識別精度95%達成の記録
 
+#### メモリーバンク (`memory-bank/`)
 - `projectbrief.md`: プロジェクト概要とMVP範囲
-- `systemPatterns.md`: アーキテクチャと実装パターン
-- `techContext.md`: 技術スタック詳細
-- `activeContext.md`: 現在の作業状態
-- `progress.md`: 進捗管理
-- `productContext.md`: ユーザー要件
+- `progress.md`: 全フェーズ（Phase 0-7）の進捗管理
+- `gemini-api-tier-management.md`: 無料枠・有料枠API切り替え管理
 
 ### コントリビューション
 
