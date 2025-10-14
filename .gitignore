@@ -41,3 +41,10 @@ downloads/
 
 # Phase 6-3 (Vector DB + Semantic Search)
 chroma_db/
+
+# Logs
+monitor.log
+monitor_error.log
+
+# Personal documents
+*.pdf
