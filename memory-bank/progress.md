@@ -358,7 +358,7 @@
 
 ---
 
-### ⬜ Phase 8: パイプライン最適化とVector DB統合（実装中）
+### ⬜ Phase 8: パイプライン最適化とVector DB統合（Stage 8-3まで完了、8-4実施中）
 **目標**: タスク順序の再構築、話者推論精度向上、エンティティ統一、統合Vector DB構築
 
 **完了日**: 2025-10-14開始
@@ -439,23 +439,40 @@
 }
 ```
 
-#### Stage 8-3: 統合Vector DB構築（予定）
+#### Stage 8-3: 統合Vector DB構築（完了 2025-10-14）
 
 **対象ファイル:**
-- `build_unified_vector_index.py` (新規作成)
-- `semantic_search.py` (修正)
-- `rag_qa.py` (修正)
+- `build_unified_vector_index.py` (既存スクリプト使用)
+- `semantic_search.py` (修正完了)
+- `rag_qa.py` (修正完了)
+- `test_cross_file_search.py` (新規テストスクリプト)
 
 **実装内容:**
 - 全5ファイルを1つのコレクション"transcripts_unified"に統合
 - 統一されたentity_idでベクトル化
 - メタデータにsource_file追加
 - 1クエリで5ファイル横断検索
+- semantic_search.pyとrag_qa.pyのデフォルトコレクション名を"transcripts_unified"に変更
 
-**獲得する成果:**
+**テスト結果:**
+- ✅ 統合Vector DB構築完了: 6,551セグメント (5ファイル統合)
+  - 09-22 意思決定ミーティング.mp3: 713 documents
+  - 10-07 面談：キャリア変遷と今後の事業展望.mp3: 3,442 documents
+  - 08-07 AI営業について.mp3: 481 documents
+  - 08-07 杉本さん_林さん_AI話.mp3: 69 documents
+  - Test_Recording.m4a: 1,846 documents
+- ✅ 横断検索テスト: 3/3テスト成功
+  - Test 1: リクルートでの営業経験 → 結果取得成功
+  - Test 2: 起業やビジネス戦略 → 結果取得成功
+  - Test 3: エンティティ統一確認 → canonical_name表示確認
+- ✅ source_fileメタデータ正常動作確認
+- ✅ entity_id統一確認（例: person_unmapped_000, org_001）
+
+**獲得した成果:**
 - 横断検索クエリ数: 5回 → 1回（80%削減）
-- 検索精度向上: エンティティ統一により「福島」で「福島さん」もヒット
-- クロスミーティング分析: 複数会議にまたがるトピック追跡
+- 検索精度向上: エンティティ統一により「福島」で「福島さん」もヒット可能
+- クロスミーティング分析: 複数会議にまたがるトピック追跡可能
+- メタデータ一貫性: 全ファイルで統一されたentity_id管理
 
 #### Stage 8-4: 検証とドキュメント更新（予定）
 

@@ -68,18 +68,18 @@ class SemanticSearchEngine:
     def search(
         self,
         query: str,
-        collection_name: str,
+        collection_name: str = "transcripts_unified",
         n_results: int = 5,
         filter_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        セマンティック検索を実行
+        セマンティック検索を実行（デフォルト: 統合コレクション）
 
         Args:
             query: 検索クエリ（自然言語）
-            collection_name: ChromaDBコレクション名
+            collection_name: ChromaDBコレクション名（デフォルト: transcripts_unified）
             n_results: 返す結果の数
-            filter_metadata: メタデータフィルター（例: {"topics": {"$contains": "会議"}}）
+            filter_metadata: メタデータフィルター（例: {"source_file": {"$contains": "09-22"}}）
 
         Returns:
             検索結果のディクショナリ
@@ -165,12 +165,17 @@ class SemanticSearchEngine:
 
             # メタデータ表示
             meta = result['metadata']
-            print(f"\n⏱️  Time: {meta.get('start_time', 'N/A'):.2f}s - {meta.get('end_time', 'N/A'):.2f}s")
-            print(f"   Duration: {meta.get('duration', 0):.2f}s")
+
+            # ソースファイル表示（統合コレクション用）
+            if meta.get('source_file'):
+                print(f"\n📂 Source: {meta['source_file']}")
+
+            print(f"🗣️  Speaker: {meta.get('speaker', 'N/A')}")
+            print(f"⏱️  Timestamp: {meta.get('timestamp', 'N/A')}")
             print(f"   Segment ID: {meta.get('segment_id', 'N/A')}")
 
-            if meta.get('topics'):
-                print(f"\n🏷️  Segment Topics: {meta['topics']}")
+            if meta.get('segment_topics'):
+                print(f"\n🏷️  Segment Topics: {meta['segment_topics']}")
 
             if meta.get('global_topics'):
                 print(f"   Global Topics: {meta['global_topics']}")
@@ -189,15 +194,15 @@ class SemanticSearchEngine:
     def search_by_topic(
         self,
         topic: str,
-        collection_name: str,
+        collection_name: str = "transcripts_unified",
         n_results: int = 5
     ) -> Dict[str, Any]:
-        """トピックで検索"""
+        """トピックで検索（デフォルト: 統合コレクション）"""
         print(f"\n🏷️  Searching by topic: '{topic}'")
 
         filter_metadata = {
             "$or": [
-                {"topics": {"$contains": topic}},
+                {"segment_topics": {"$contains": topic}},
                 {"global_topics": {"$contains": topic}}
             ]
         }
@@ -212,18 +217,18 @@ class SemanticSearchEngine:
     def search_by_time_range(
         self,
         query: str,
-        collection_name: str,
-        start_time: float,
-        end_time: float,
+        collection_name: str = "transcripts_unified",
+        start_time: float = 0,
+        end_time: float = 99999,
         n_results: int = 5
     ) -> Dict[str, Any]:
-        """時間範囲で検索"""
+        """時間範囲で検索（デフォルト: 統合コレクション）"""
         print(f"\n⏱️  Searching in time range: {start_time}s - {end_time}s")
 
         filter_metadata = {
             "$and": [
                 {"start_time": {"$gte": start_time}},
-                {"end_time": {"$lte": end_time}}
+                {"start_time": {"$lte": end_time}}
             ]
         }
 
@@ -254,9 +259,11 @@ def main():
         print("❌ No collections found. Please run build_vector_index.py first.")
         sys.exit(1)
 
-    # コレクション選択（最初のコレクションを使用、またはCLI引数で指定）
+    # コレクション選択（デフォルト: transcripts_unified、またはCLI引数で指定）
     if len(sys.argv) > 1:
         collection_name = sys.argv[1]
+    elif "transcripts_unified" in collections:
+        collection_name = "transcripts_unified"
     else:
         collection_name = collections[0]  # デフォルトは最初のコレクション
 

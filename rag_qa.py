@@ -67,15 +67,15 @@ class RAGQASystem:
     def retrieve_context(
         self,
         query: str,
-        collection_name: str,
+        collection_name: str = "transcripts_unified",
         n_results: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        質問に関連するコンテキストをChromaDBから検索
+        質問に関連するコンテキストをChromaDBから検索（デフォルト: 統合コレクション）
 
         Args:
             query: ユーザーの質問
-            collection_name: ChromaDBコレクション名
+            collection_name: ChromaDBコレクション名（デフォルト: transcripts_unified）
             n_results: 検索する結果数
 
         Returns:
@@ -136,10 +136,12 @@ class RAGQASystem:
         """
         print(f"\n🤖 Generating answer with Gemini...")
 
-        # コンテキストテキストを構築
+        # コンテキストテキストを構築（統合コレクション対応）
         context_text = "\n\n---\n\n".join([
-            f"[セグメント {i+1}] (開始時刻: {ctx['metadata'].get('start_time', 'N/A'):.2f}秒)\n"
-            f"トピック: {ctx['metadata'].get('topics', '不明')}\n"
+            f"[セグメント {i+1}] (ソース: {ctx['metadata'].get('source_file', 'N/A')})\n"
+            f"話者: {ctx['metadata'].get('speaker', 'N/A')}\n"
+            f"タイムスタンプ: {ctx['metadata'].get('timestamp', 'N/A')}\n"
+            f"トピック: {ctx['metadata'].get('segment_topics', ctx['metadata'].get('global_topics', '不明'))}\n"
             f"内容: {ctx['text']}"
             for i, ctx in enumerate(contexts)
         ])
@@ -179,15 +181,15 @@ class RAGQASystem:
     def ask(
         self,
         query: str,
-        collection_name: str,
+        collection_name: str = "transcripts_unified",
         n_contexts: int = 5
     ) -> Dict[str, Any]:
         """
-        質問に回答する（メイン関数）
+        質問に回答する（メイン関数）（デフォルト: 統合コレクション）
 
         Args:
             query: ユーザーの質問
-            collection_name: ChromaDBコレクション名
+            collection_name: ChromaDBコレクション名（デフォルト: transcripts_unified）
             n_contexts: 使用するコンテキスト数
 
         Returns:
@@ -218,11 +220,16 @@ class RAGQASystem:
             meta = ctx['metadata']
 
             print(f"\n[セグメント {i}] (類似度: {ctx['similarity_score']:.4f})")
-            print(f"⏱️  時刻: {meta.get('start_time', 'N/A'):.2f}s - {meta.get('end_time', 'N/A'):.2f}s")
-            print(f"   ファイル: {meta.get('file_name', 'N/A')}")
 
-            if meta.get('topics'):
-                print(f"🏷️  トピック: {meta['topics']}")
+            # ソースファイル表示（統合コレクション対応）
+            if meta.get('source_file'):
+                print(f"📂 ソース: {meta['source_file']}")
+
+            print(f"🗣️  話者: {meta.get('speaker', 'N/A')}")
+            print(f"⏱️  タイムスタンプ: {meta.get('timestamp', 'N/A')}")
+
+            if meta.get('segment_topics'):
+                print(f"🏷️  トピック: {meta['segment_topics']}")
 
             if meta.get('people'):
                 print(f"👥 人物: {meta['people']}")
@@ -235,15 +242,15 @@ class RAGQASystem:
     def batch_ask(
         self,
         questions: List[str],
-        collection_name: str,
+        collection_name: str = "transcripts_unified",
         n_contexts: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        複数の質問に一括で回答
+        複数の質問に一括で回答（デフォルト: 統合コレクション）
 
         Args:
             questions: 質問のリスト
-            collection_name: ChromaDBコレクション名
+            collection_name: ChromaDBコレクション名（デフォルト: transcripts_unified）
             n_contexts: 使用するコンテキスト数
 
         Returns:
