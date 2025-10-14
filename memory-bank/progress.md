@@ -356,6 +356,116 @@
 **Phase 7完了により、プロジェクトの主要実装は完了しました。**
 **OpenAI API依存ゼロ、年間コスト$0、Gemini完全統一を達成しました。**
 
+---
+
+### ⬜ Phase 8: パイプライン最適化とVector DB統合（実装中）
+**目標**: タスク順序の再構築、話者推論精度向上、エンティティ統一、統合Vector DB構築
+
+**完了日**: 2025-10-14開始
+
+#### 背景と問題点
+現在のパイプラインには以下の問題がある:
+1. **タスク順序が非効率**: Vector DB構築がエンティティ名寄せより先に実行
+2. **エンティティ不統一**: 「福島さん」「福島」が別エンティティとしてベクトル化
+3. **話者推論プロンプト不正確**: 杉本さんのプロフィールが実態と異なる
+4. **5ファイル独立コレクション**: 横断検索に5回のクエリが必要
+
+#### Stage 8-1: メモリーバンク更新 + 話者推論改善（完了 2025-10-14）
+
+**対象ファイル:**
+- `memory-bank/phase8-plan.md` (新規作成)
+- `memory-bank/progress.md` (更新)
+- `infer_speakers.py` (杉本さんプロフィール更新)
+
+**実装内容:**
+- 杉本さんプロフィールを職務経歴書ベースに更新:
+  * 性別: 男性
+  * 呼称: 杉本、すーさん、ゆうき、ゆうきくん、杉本さん
+  * 声質: 低めかつ少しこもった声
+  * 経歴: リクルート営業 → CS学位取得 → AI/機械学習エンジニア
+  * 現職: エクサウィザーズ（生成AI担当）、次はビズリーチ（AIエンジニア）
+  * 専門領域: 営業+エンジニアリング、要求定義力
+  * 思考性: 起業目標、アメリカ転職目標、本質的価値追求
+
+**テスト結果:**
+- ✅ 09-22 意思決定ミーティング.mp3: 杉本さん特定成功（Speaker 2、confidence: high）
+- 判定理由: ビズリーチ転職先情報（社内DX・AIエージェント構築）が完全一致
+- Sugimoto: 351セグメント、Other: 362セグメント
+
+**獲得した成果:**
+- 話者推論精度向上（経歴・声質・思考性を反映）
+- プロフィール詳細化により判定根拠が明確化
+
+#### Stage 8-2: エンティティ名寄せ結果の_enhanced.json反映（予定）
+
+**対象ファイル:**
+- `entity_resolution_llm.py` (修正)
+- 全5ファイルの`*_enhanced.json` (更新)
+
+**実装内容:**
+- 名寄せ結果を各_enhanced.jsonに反映
+- canonical_name（正規化名）とentity_id付与
+- モデル変更: gemini-2.0-flash-exp → gemini-2.5-pro（文脈理解精度向上）
+
+**新しいentitiesフィールド構造:**
+```json
+{
+  "entities": {
+    "people": [
+      {
+        "name": "福島さん",
+        "canonical_name": "福島",
+        "entity_id": "person_001",
+        "variants": ["福島", "福島さん"]
+      }
+    ]
+  }
+}
+```
+
+#### Stage 8-3: 統合Vector DB構築（予定）
+
+**対象ファイル:**
+- `build_unified_vector_index.py` (新規作成)
+- `semantic_search.py` (修正)
+- `rag_qa.py` (修正)
+
+**実装内容:**
+- 全5ファイルを1つのコレクション"transcripts_unified"に統合
+- 統一されたentity_idでベクトル化
+- メタデータにsource_file追加
+- 1クエリで5ファイル横断検索
+
+**獲得する成果:**
+- 横断検索クエリ数: 5回 → 1回（80%削減）
+- 検索精度向上: エンティティ統一により「福島」で「福島さん」もヒット
+- クロスミーティング分析: 複数会議にまたがるトピック追跡
+
+#### Stage 8-4: 検証とドキュメント更新（予定）
+
+**対象ファイル:**
+- `README.md` (更新)
+- `memory-bank/progress.md` (Phase 8完了記録)
+
+**実装内容:**
+- 話者推論精度、エンティティ統一率、横断検索テスト
+- 新パイプライン順序の説明追加
+- Phase 8完了記録
+
+#### 技術スタック詳細
+
+**改善後のパイプライン順序:**
+1. `structured_transcribe.py` → _structured.json（音声文字起こし）
+2. `infer_speakers.py` → _structured_with_speakers.json（話者推論）
+3. `add_topics_entities.py` → _enhanced.json（トピック・エンティティ抽出）
+4. `entity_resolution_llm.py` → _enhanced.json更新（名寄せ + canonical_name付与）
+5. `build_unified_vector_index.py` → transcripts_unified（統合Vector DB構築）
+6. `semantic_search.py`, `rag_qa.py` → 5ファイル横断検索（1クエリ）
+
+**推定総所要時間: 7-11時間**
+
+---
+
 ## 完了タスク
 
 ### 2025-10-09（方針変更: Google Drive連携へ）
