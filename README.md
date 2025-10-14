@@ -206,6 +206,88 @@ cat .env
 └── archive_phase1_local_whisper/  # 旧実装アーカイブ
 ```
 
+## Phase 8: 統合パイプライン（2025-10-14完了）
+
+Phase 8では、パイプライン最適化、話者推論精度向上、エンティティ統一、統合Vector DBを実装しました。
+
+### パイプライン処理順序
+
+**最適化後のパイプライン:**
+
+```
+1. structured_transcribe.py
+   ↓ _structured.json（音声文字起こし）
+
+2. infer_speakers.py
+   ↓ _structured_with_speakers.json（話者推論）
+
+3. add_topics_entities.py
+   ↓ _enhanced.json（トピック・エンティティ抽出）
+
+4. entity_resolution_llm.py
+   ↓ _enhanced.json更新（エンティティ名寄せ + canonical_name付与）
+
+5. build_unified_vector_index.py
+   ↓ ChromaDB: transcripts_unified（統合Vector DB構築）
+
+6. semantic_search.py / rag_qa.py
+   → 5ファイル横断検索（1クエリ）
+```
+
+### 主な改善内容
+
+#### 1. 話者推論精度向上
+- 杉本さんのプロフィールを職務経歴書ベースに更新
+- 経歴・声質・思考性を反映（営業+エンジニア、起業目標、アメリカ転職目標）
+- 判定根拠の明確化
+
+#### 2. エンティティ統一管理
+- canonical_name（正規化名）とentity_id付与
+- 全5ファイル横断で統一されたID管理
+- 例: "マチックモーメンツ" + "マジックモーメント" → "Magic Moment" (entity_id: org_002)
+
+#### 3. 統合Vector DB
+- 6,551セグメント（5ファイル）を1つのコレクション"transcripts_unified"に統合
+- 横断検索クエリ数: 5回 → 1回（80%削減）
+- メタデータにsource_file追加（クロスファイル追跡）
+- エンティティ統一による検索精度向上
+
+#### 4. Vector DB & RAGスクリプト
+
+```
+├── build_vector_index.py              # 個別ファイルVector DB構築（旧版）
+├── build_unified_vector_index.py      # 統合Vector DB構築（Phase 8）
+├── semantic_search.py                 # セマンティック検索
+├── rag_qa.py                          # RAG Q&Aシステム
+├── add_topics_entities.py             # トピック・エンティティ抽出
+└── entity_resolution_llm.py           # エンティティ名寄せ
+```
+
+### テスト結果
+
+```
+✅ Test 1 PASSED: Speaker Inference (5ファイル話者特定)
+✅ Test 2 PASSED: Entity Unification (19人物、41組織統一)
+✅ Test 3 PASSED: Cross-File Search (横断検索成功)
+✅ Test 4 PASSED: RAG Q&A System (4/4クエリ成功)
+```
+
+### 使い方
+
+```bash
+# 統合Vector DB構築
+python build_unified_vector_index.py
+
+# セマンティック検索
+python semantic_search.py transcripts_unified
+
+# RAG Q&A（インタラクティブモード）
+python rag_qa.py transcripts_unified --interactive
+
+# Phase 8総合テスト
+python test_phase8_comprehensive.py
+```
+
 ## Unstructured.ioベンチマーク
 
 このプロジェクトは[Unstructured.io](https://unstructured.io/)のメタデータ構造をベンチマークとして、音声文字起こし向けに最適化しています。
