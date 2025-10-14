@@ -23,10 +23,10 @@ load_dotenv()
 
 # Gemini APIキー選択（FREE/PAID tier）
 use_paid_tier = os.getenv("USE_PAID_TIER", "").lower() == "true"
-api_key = os.getenv("GEMINI_API_KEY_PAID") if use_paid_tier else os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY_PAID") if use_paid_tier else os.getenv("GEMINI_API_KEY_FREE")
 
 if not api_key:
-    print("❌ Error: GEMINI_API_KEY not found in environment variables")
+    print("❌ Error: GEMINI_API_KEY_FREE or GEMINI_API_KEY_PAID not found in environment variables")
     sys.exit(1)
 
 genai.configure(api_key=api_key)
@@ -38,13 +38,13 @@ class EntityResolver:
 
     def __init__(self):
         """初期化"""
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('gemini-2.5-pro')
 
         print("=" * 70)
-        print("Phase 6-3 Stage 4-2: LLM-Based Entity Resolution")
+        print("Phase 8-2: LLM-Based Entity Resolution (2.5 Pro)")
         print("=" * 70)
         print("✅ Entity Resolver initialized")
-        print(f"   Model: gemini-2.0-flash-exp\n")
+        print(f"   Model: gemini-2.5-pro\n")
 
     def load_entities_from_json(self, json_files: List[str]) -> Tuple[List[Dict], List[Dict]]:
         """
@@ -408,6 +408,140 @@ class EntityResolver:
 
         print(f"✅ Report saved: {output_file}\n")
 
+    def update_enhanced_json(self,
+                            json_files: List[str],
+                            people_result: Dict,
+                            org_result: Dict) -> None:
+        """
+        エンティティ名寄せ結果を各_enhanced.jsonに反映
+
+        Args:
+            json_files: JSONファイルパスのリスト
+            people_result: 人物解決結果
+            org_result: 組織解決結果
+        """
+        print(f"\n💾 Updating {len(json_files)} _enhanced.json files with resolved entities...")
+
+        # canonical_nameマッピング作成
+        people_mapping = {}  # {original_name: {canonical_name, entity_id, variants}}
+        org_mapping = {}
+
+        # 人物マッピング
+        for i, group in enumerate(people_result.get('people_groups', []), 1):
+            canonical_name = group['canonical_name']
+            entity_id = f"person_{i:03d}"
+            for variant in group['variants']:
+                people_mapping[variant] = {
+                    'canonical_name': canonical_name,
+                    'entity_id': entity_id,
+                    'variants': group['variants']
+                }
+
+        # 組織マッピング
+        for i, group in enumerate(org_result.get('org_groups', []), 1):
+            canonical_name = group['canonical_name']
+            entity_id = f"org_{i:03d}"
+            for variant in group['variants']:
+                org_mapping[variant] = {
+                    'canonical_name': canonical_name,
+                    'entity_id': entity_id,
+                    'variants': group['variants']
+                }
+
+        # 各JSONファイルを更新
+        for json_file in json_files:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            entities = data.get('entities', {})
+
+            # 人物エンティティ更新
+            if 'people' in entities:
+                updated_people = []
+                seen = set()  # 重複除去用
+
+                for person in entities['people']:
+                    # personが文字列の場合
+                    if isinstance(person, str):
+                        name = person
+                    else:
+                        # 辞書形式の場合
+                        name = person.get('name', person)
+
+                    # マッピング適用
+                    if name in people_mapping:
+                        mapping = people_mapping[name]
+                        canonical = mapping['canonical_name']
+
+                        # 重複チェック（canonical_nameで）
+                        if canonical not in seen:
+                            updated_people.append({
+                                'name': name,
+                                'canonical_name': canonical,
+                                'entity_id': mapping['entity_id'],
+                                'variants': mapping['variants']
+                            })
+                            seen.add(canonical)
+                    else:
+                        # マッピングされていない場合はそのまま
+                        if name not in seen:
+                            updated_people.append({
+                                'name': name,
+                                'canonical_name': name,
+                                'entity_id': f"person_unmapped_{len(updated_people):03d}",
+                                'variants': [name]
+                            })
+                            seen.add(name)
+
+                entities['people'] = updated_people
+
+            # 組織エンティティ更新
+            if 'organizations' in entities:
+                updated_orgs = []
+                seen = set()
+
+                for org in entities['organizations']:
+                    if isinstance(org, str):
+                        name = org
+                    else:
+                        name = org.get('name', org)
+
+                    if name in org_mapping:
+                        mapping = org_mapping[name]
+                        canonical = mapping['canonical_name']
+
+                        if canonical not in seen:
+                            updated_orgs.append({
+                                'name': name,
+                                'canonical_name': canonical,
+                                'entity_id': mapping['entity_id'],
+                                'variants': mapping['variants']
+                            })
+                            seen.add(canonical)
+                    else:
+                        if name not in seen:
+                            updated_orgs.append({
+                                'name': name,
+                                'canonical_name': name,
+                                'entity_id': f"org_unmapped_{len(updated_orgs):03d}",
+                                'variants': [name]
+                            })
+                            seen.add(name)
+
+                entities['organizations'] = updated_orgs
+
+            # JSONファイルに書き戻し
+            data['entities'] = entities
+
+            with open(json_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+            file_name = Path(json_file).name
+            print(f"   ✅ Updated: {file_name}")
+            print(f"      People: {len(entities.get('people', []))}, Orgs: {len(entities.get('organizations', []))}")
+
+        print(f"\n✅ All _enhanced.json files updated with resolved entities\n")
+
 
 def main():
     """メイン処理"""
@@ -432,9 +566,12 @@ def main():
     # レポート生成
     resolver.generate_report(people, people_result, organizations, org_result)
 
+    # _enhanced.json更新
+    resolver.update_enhanced_json(json_files, people_result, org_result)
+
     print("=" * 70)
     print("✅ Entity resolution completed!")
-    print("   Cost: Free (Gemini 2.0 Flash)")
+    print("   Cost: Free (Gemini 2.5 Pro)")
     print("=" * 70)
 
 

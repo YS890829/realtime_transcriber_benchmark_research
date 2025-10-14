@@ -396,7 +396,7 @@
 - 話者推論精度向上（経歴・声質・思考性を反映）
 - プロフィール詳細化により判定根拠が明確化
 
-#### Stage 8-2: エンティティ名寄せ結果の_enhanced.json反映（予定）
+#### Stage 8-2: エンティティ名寄せ結果の_enhanced.json反映（完了 2025-10-14）
 
 **対象ファイル:**
 - `entity_resolution_llm.py` (修正)
@@ -406,6 +406,14 @@
 - 名寄せ結果を各_enhanced.jsonに反映
 - canonical_name（正規化名）とentity_id付与
 - モデル変更: gemini-2.0-flash-exp → gemini-2.5-pro（文脈理解精度向上）
+- `update_enhanced_json()` メソッド追加：名寄せ結果をJSONに書き戻し
+
+**テスト結果:**
+- ✅ 全5ファイル処理完了
+- 人物エンティティ: 19名処理、0グループ統合、19個別エンティティ
+- 組織エンティティ: 45組織処理、3グループ統合、38個別エンティティ
+- 統合例: "マチックモーメンツ" + "マジックモーメント" → "Magic Moment" (entity_id: org_002)
+- JSON更新: 全5ファイルの_enhanced.json更新完了
 
 **新しいentitiesフィールド構造:**
 ```json
@@ -413,10 +421,18 @@
   "entities": {
     "people": [
       {
-        "name": "福島さん",
-        "canonical_name": "福島",
-        "entity_id": "person_001",
-        "variants": ["福島", "福島さん"]
+        "name": "石田",
+        "canonical_name": "石田",
+        "entity_id": "person_unmapped_000",
+        "variants": ["石田"]
+      }
+    ],
+    "organizations": [
+      {
+        "name": "マチックモーメンツ",
+        "canonical_name": "Magic Moment",
+        "entity_id": "org_002",
+        "variants": ["マチックモーメンツ", "マジックモーメント"]
       }
     ]
   }
