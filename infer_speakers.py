@@ -60,8 +60,8 @@ def analyze_speakers(segments, file_context=""):
 {conversation_text}
 
 【タスク】
-この会話に「杉本」という人物が参加していますか？
-参加している場合、Speaker 1とSpeaker 2のどちらが杉本さんですか？
+この会話には必ず「杉本」が参加しています。
+Speaker 1とSpeaker 2のどちらが杉本さんかを特定してください。
 
 【杉本さんのプロフィール】
 - 性別: 男性
@@ -116,20 +116,22 @@ def analyze_speakers(segments, file_context=""):
 7. 専門用語の使用: 機械学習、RAG、クラスタリング、分類予測、FastAPI、Pythonなどの技術用語を自然に使う
 
 【重要】
+- **この録音は杉本さん自身が録音したものであり、必ず杉本さんが話者として含まれています**
+- **独白（一人語り）の場合、その話者は100%杉本さんです**
 - 名前が明示されていなくても、上記プロフィールと一致すれば「medium」以上の確信度で判定可能
-- 独白や一人語りの場合、発言者が杉本さんである可能性が高い
 - 面談やインタビュー形式で自身のキャリアを語る側が杉本さんの可能性が高い
 - リクルート時代の営業経験やAI/機械学習エンジニアとしての経験を語る場合、杉本さんである可能性が高い
 - 起業やアメリカ転職の目標について語る場合、杉本さんである可能性が高い
 
 【回答形式】
-以下のJSON形式で回答してください:
+以下のJSON形式で回答してください。必ずSpeaker 1かSpeaker 2のいずれかを特定してください:
 {{
-  "sugimoto_identified": true/false,
-  "sugimoto_speaker": "Speaker 1" or "Speaker 2" or null,
+  "sugimoto_speaker": "Speaker 1" or "Speaker 2",
   "confidence": "high" or "medium" or "low",
   "reasoning": "判断理由を簡潔に（使用した判断基準を明記）"
-}}"""
+}}
+
+注意: sugimoto_speakerは必須です。nullは許可されません。必ずどちらかの話者を選択してください。"""
 
     model = genai.GenerativeModel('gemini-2.5-pro')
 
@@ -142,6 +144,16 @@ def analyze_speakers(segments, file_context=""):
     )
 
     result = json.loads(response.text)
+
+    # sugimoto_speakerがnullまたは存在しない場合のエラーハンドリング
+    if not result.get('sugimoto_speaker'):
+        raise ValueError(
+            f"❌ LLMが杉本さんを特定できませんでした。\n"
+            f"Reasoning: {result.get('reasoning', 'N/A')}\n"
+            f"この録音には必ず杉本さんが含まれているはずです。\n"
+            f"プロンプトを見直すか、サンプルサイズを増やしてください。"
+        )
+
     return result
 
 def infer_speakers(input_file):
@@ -162,46 +174,41 @@ def infer_speakers(input_file):
     result = analyze_speakers(segments, file_context=file_name)
 
     print(f"\n📊 Analysis Result:")
-    print(f"   Sugimoto identified: {result['sugimoto_identified']}")
     print(f"   Sugimoto speaker: {result['sugimoto_speaker']}")
     print(f"   Confidence: {result['confidence']}")
     print(f"   Reasoning: {result['reasoning']}")
 
-    # セグメントの話者名を更新
-    if result['sugimoto_identified'] and result['sugimoto_speaker']:
-        sugimoto_speaker = result['sugimoto_speaker']
-        other_speaker = "Speaker 1" if sugimoto_speaker == "Speaker 2" else "Speaker 2"
+    # セグメントの話者名を更新（必ず杉本が特定されている前提）
+    sugimoto_speaker = result['sugimoto_speaker']
+    other_speaker = "Speaker 1" if sugimoto_speaker == "Speaker 2" else "Speaker 2"
 
-        updated_segments = []
-        sugimoto_count = 0
-        other_count = 0
+    updated_segments = []
+    sugimoto_count = 0
+    other_count = 0
 
-        for seg in segments:
-            new_seg = seg.copy()
-            if seg['speaker'] == sugimoto_speaker:
-                new_seg['speaker'] = "Sugimoto"
-                new_seg['original_speaker'] = seg['speaker']
-                sugimoto_count += 1
-            elif seg['speaker'] == other_speaker:
-                new_seg['speaker'] = "Other"
-                new_seg['original_speaker'] = seg['speaker']
-                other_count += 1
-            updated_segments.append(new_seg)
+    for seg in segments:
+        new_seg = seg.copy()
+        if seg['speaker'] == sugimoto_speaker:
+            new_seg['speaker'] = "Sugimoto"
+            new_seg['original_speaker'] = seg['speaker']
+            sugimoto_count += 1
+        elif seg['speaker'] == other_speaker:
+            new_seg['speaker'] = "Other"
+            new_seg['original_speaker'] = seg['speaker']
+            other_count += 1
+        updated_segments.append(new_seg)
 
-        print(f"\n✅ Updated speakers:")
-        print(f"   Sugimoto: {sugimoto_count} segments")
-        print(f"   Other: {other_count} segments")
-    else:
-        print(f"\n⚠️  Could not identify Sugimoto, keeping original speaker labels")
-        updated_segments = segments
+    print(f"\n✅ Updated speakers:")
+    print(f"   Sugimoto: {sugimoto_count} segments")
+    print(f"   Other: {other_count} segments")
 
     # メタデータ更新
     data['segments'] = updated_segments
     data['metadata']['speaker_inference'] = {
         'inferred_at': datetime.now().isoformat(),
         'result': result,
-        'sugimoto_segments': sugimoto_count if result['sugimoto_identified'] else 0,
-        'other_segments': other_count if result['sugimoto_identified'] else 0
+        'sugimoto_segments': sugimoto_count,
+        'other_segments': other_count
     }
 
     # 出力ファイル名
