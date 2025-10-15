@@ -805,13 +805,88 @@ Phase 7検証スクリプトはプロジェクトのコア機能として重要�
 - 無料枠: 5 RPM制限検出 ✅
 - 有料枠: 6/6リクエスト成功（8秒） ✅
 
+---
+
+### ✅ GitHub設定とリポジトリセットアップ（完了 2025-10-15）
+**目標**: GitHubリポジトリの作成とローカルプロジェクトのプッシュ
+
+**完了日**: 2025-10-15
+
+#### 実施内容
+
+**SSH鍵生成と設定:**
+- ed25519形式のSSH鍵ペア生成（`~/.ssh/id_ed25519`）
+- GitHubにSSH公開鍵を登録（https://github.com/settings/ssh/new）
+- SSH接続テスト成功（`ssh -T git@github.com`）
+
+**GitHubリポジトリ作成:**
+- リポジトリ名: `realtime_transcriber_benchmark_research`
+- 説明: リアルタイム文字起こしサービスのベンチマーク調査プロジェクト
+- 公開リポジトリ（private: false）
+- リポジトリURL: https://github.com/YS890829/realtime_transcriber_benchmark_research
+
+**大容量ファイルの履歴削除:**
+- 問題: リポジトリサイズ 2.7GB（1.5GBのWhisperモデルファイル含む）
+- 削除対象ファイル:
+  * `archive_phase1_local_whisper/models/` (1.5GB Whisper model)
+  * `Test Recording.m4a` (106MB)
+  * `Test Recording_10min.m4a` (9.5MB)
+- `.gitignore`更新: 音声ファイル（*.m4a, *.mp3, *.wav）とモデルディレクトリを追加
+- `git filter-branch`で履歴から完全削除
+- リポジトリサイズ: **2.7GB → 420KB**（99.8%削減）
+
+**セキュリティ対策（トークン削除）:**
+- 問題: GitHub Push Protectionがトークンを検出（Hugging Face User Access Token）
+- 該当ファイル: `memory-bank/phase6-status.md`（履歴内のみ存在）
+- 該当コミット: d2fa3de, df64b51, afc72c7
+- 対応: `git filter-branch`で全履歴からトークンを`[REDACTED]`に置換
+- 検証: `git log --all -S "hf_grq..."` → トークン完全削除確認
+
+**プッシュ完了:**
+- Force push成功: `git push -f origin main`
+- 全コミット（69件）をGitHubにプッシュ完了
+- セキュリティアラート: なし（クリーンな状態）
+
+#### 技術スタック
+
+**Git操作:**
+- SSH認証: ed25519鍵ペア
+- Git filter-branch: 大容量ファイル削除、トークン置換
+- Git garbage collection: リポジトリ圧縮（`git gc --prune=now --aggressive`）
+- Force push: 履歴書き換え後のプッシュ
+
+**GitHub MCP統合:**
+- GitHub MCP Server使用（`mcp__github__create_repository`）
+- Personal Access Token: `.env`ファイルに保存（`GITHUB_PERSONAL_ACCESS_TOKEN`）
+- リモートURL: SSH形式（`git@github.com:YS890829/...`）
+
+#### 成果
+
+**リポジトリクリーンアップ:**
+- サイズ削減: 2.7GB → 420KB（99.8%削減）
+- セキュリティ: トークン完全削除、Push Protection通過
+- 履歴整理: 不要な大容量ファイル削除
+
+**GitHub連携確立:**
+- SSH認証設定完了（今後のプッシュが高速化）
+- リモートリポジトリ作成完了
+- 全コミット履歴のバックアップ完了
+
+**次回以降の作業効率化:**
+- `.gitignore`更新により、今後は大容量ファイルが誤コミットされない
+- SSH鍵設定により、パスワード入力不要
+- GitHub MCPによる自動化基盤確立
+
+---
+
 ## 次のアクション
 
 ### 現在のステータス
-Phase 8完了（2025-10-14）。統合パイプライン確立、話者推論精度向上、エンティティ統一、統合Vector DB構築完了。次のフェーズは未定。
+Phase 8完了（2025-10-14）。GitHub設定完了（2025-10-15）。統合パイプライン確立、話者推論精度向上、エンティティ統一、統合Vector DB構築完了。次のフェーズは未定。
 
 ## 更新履歴
 
+- **2025-10-15**: GitHub設定とリポジトリセットアップ完了（SSH鍵生成、リポジトリ作成、大容量ファイル削除、トークン削除、プッシュ完了）
 - **2025-10-14**: Phase 8完了（Stage 8-1〜8-6）、話者推論プロンプト改善（杉本さんの必須存在明示化）、無料枠キャパシティ分析ツール追加
 - **2025-10-13**: 検証スクリプト復元（validation/→ルート）、README.md・progress.md更新
 - **2025-10-13**: プロジェクト直下ファイル整理完了（validation/フォルダ作成、セキュリティファイル削除、検証スクリプト移動）【撤回済み】
