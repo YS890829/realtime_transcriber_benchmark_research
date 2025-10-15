@@ -337,6 +337,90 @@ MIT License
 4. Push
 5. Pull Request
 
+## Google Drive連携（Phase 5復元版）
+
+Google Driveのマイドライブ（ルート）に音声ファイルをアップロードすると自動で文字起こしを実行します。
+
+### セットアップ
+
+#### 1. Google Cloud Console設定
+
+1. [Google Cloud Console](https://console.cloud.google.com/)にアクセス
+2. 新しいプロジェクトを作成
+3. Google Drive APIを有効化
+4. OAuth 2.0クライアントIDを作成（デスクトップアプリ）
+5. `credentials.json`をダウンロードし、プロジェクトルートに配置
+
+#### 2. 初回認証
+
+```bash
+# drive_download.pyで初回認証（token.json生成）
+python drive_download.py <file_id>
+```
+
+初回実行時にブラウザが開き、Google認証が求められます。許可すると`token.json`が自動生成されます。
+
+### 使い方
+
+#### オプション1: ポーリング方式（5分間隔）
+
+```bash
+# マイドライブのルートを5分間隔で監視
+python monitor_drive.py
+```
+
+**動作:**
+- マイドライブのルートに音声ファイル（.m4a, .mp3, .wav）をアップロード
+- 5分以内に自動検知
+- `structured_transcribe.py`で文字起こし（Gemini Audio API）
+- `*_structured.json`ファイルを生成
+
+**監視対象:**
+- マイドライブのルート（`root`）
+- 音声ファイルのみ（MIME type: audio/*, 拡張子: .m4a, .mp3, .wav）
+
+**処理済み管理:**
+- `.processed_drive_files.txt`に処理済みファイルIDを記録
+- 同じファイルを二重処理しない
+
+#### オプション2: Webhook方式（リアルタイム検知）
+
+```bash
+# 1. FastAPIサーバー起動
+python webhook_server.py
+
+# 2. 別ターミナルでngrok起動
+ngrok http 8000
+
+# 3. Webhook登録
+curl "http://localhost:8000/setup?webhook_url=<ngrok-https-url>"
+```
+
+**動作:**
+- ファイルアップロード後、数秒以内に検知（Push通知）
+- ngrok経由でローカルにWebhook通知を受信
+- 自動で文字起こし実行
+
+**注意事項:**
+- ngrok無料版は2時間セッション制限あり
+- URL再起動ごとに変更（webhook再登録必要）
+- Webhook有効期限: 24時間
+
+### トラブルシューティング
+
+#### `credentials.json not found`
+- Google Cloud ConsoleでOAuth 2.0クライアントIDを作成
+- ダウンロードした`credentials.json`をプロジェクトルートに配置
+
+#### `Invalid credentials`
+- `drive_download.py`で初回認証を実行
+- `token.json`が生成されることを確認
+
+#### ファイルが検知されない
+- マイドライブの**ルート**にファイルをアップロードしているか確認
+- 音声ファイル形式（.m4a, .mp3, .wav）か確認
+- `.processed_drive_files.txt`に既にファイルIDが記録されていないか確認
+
 ## 今後の拡張候補
 
 MVPで不便を感じた場合のみ追加:

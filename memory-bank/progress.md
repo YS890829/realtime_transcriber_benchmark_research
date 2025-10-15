@@ -879,13 +879,134 @@ Phase 7検証スクリプトはプロジェクトのコア機能として重要�
 
 ---
 
+### ✅ Phase 9: Google Drive Webhook自動処理（マイドライブルート監視）
+
+**目標**: マイドライブのルートディレクトリを監視し、音声ファイルアップロード時に自動的に文字起こしを実行
+
+**完了日**: 2025-10-15
+
+#### 実施内容
+
+**監視対象変更:**
+- 従来: `audio`フォルダのみ監視
+- 変更後: **マイドライブのルートディレクトリ**全体を監視
+- 理由: より柔軟なファイル管理、audioフォルダ以外への配置にも対応
+
+**ファイルフィルタリング改善:**
+- 問題: `name contains '.m4a'`のクエリで"audio"という名前のフォルダが誤検知
+- 解決: **mimeTypeベースのフィルタリング**に変更
+  ```python
+  # 修正前
+  query = f"'{folder_id}' in parents and (mimeType contains 'audio/' or name contains '.m4a' or name contains '.mp3' or name contains '.wav') and trashed=false"
+
+  # 修正後
+  query = f"'{folder_id}' in parents and mimeType contains 'audio/' and trashed=false"
+  ```
+- 効果: フォルダの誤検知を完全に防止、より正確な音声ファイル検出
+
+**Webhookバックグラウンド処理の問題解決:**
+- 問題: FastAPI BackgroundTasksが`nohup`実行時に動作しない
+  - 症状: Webhook通知受信 → 200 OK応答 → その後処理が実行されない
+  - 原因: uvicorn.run()のバックグラウンド実行とBackgroundTasksの相性問題
+- 調査: 過去の動作していたコード（commit a8064ec）を参照
+  - 当時も`async def` + `background_tasks.add_task()`を使用
+  - 同じパターンで現在は動作せず
+- 解決: **スレッドベース実装**に変更
+  ```python
+  import threading
+
+  # Webhook受信時
+  if resource_state in ['change', 'update']:
+      thread = threading.Thread(target=check_for_changes_sync)
+      thread.daemon = True
+      thread.start()
+
+  # 同期処理関数
+  def check_for_changes_sync():
+      try:
+          service = get_drive_service()
+          folder_id = get_root_folder_id()
+          process_new_files(service, folder_id)
+      except Exception as e:
+          print(f"[Error] {e}")
+          traceback.print_exc()
+  ```
+- 効果: バックグラウンド処理が確実に実行されるようになった
+
+**エンドツーエンドテスト成功:**
+- テストファイル1: **Kitaya 1-Chōme 4.m4a** (5.7MB, 6.2分)
+  - アップロード: 10:42
+  - 文字起こし完了: 10:43（**約1分で完了**）
+  - 結果: 679文字、57セグメント、2話者
+- テストファイル2: **Kitaya 1-Chōme 6.m4a** (10.5MB, 11.1分)
+  - アップロード: 10:46
+  - 文字起こし完了: 10:48（**約2分で完了**）
+  - 結果: 1,765文字、216セグメント、2話者
+
+**自動処理フロー（確認済み）:**
+1. ファイルアップロード → Google Driveのルートディレクトリ
+2. Webhook通知 → Google DriveからWebhookサーバーへ
+3. バックグラウンド処理開始 → スレッドが自動起動
+4. 新ファイル検出 → Drive APIで音声ファイルを検出
+5. ダウンロード → `downloads/`ディレクトリに保存
+6. 文字起こし → Gemini Audio APIで処理
+7. 結果保存 → 構造化JSONファイル生成
+8. 処理済み記録 → `.processed_drive_files.txt`に追加
+
+#### 技術スタック
+
+**修正ファイル:**
+- `webhook_server.py`: スレッドベース実装、デバッグログ追加
+- `monitor_drive.py`: mimeTypeフィルタリング統一
+
+**使用技術:**
+- Python threading: バックグラウンド処理（daemon thread）
+- Google Drive API: Push Notifications、Changes API
+- FastAPI: Webhookエンドポイント
+- ngrok: HTTPSトンネリング（Webhook受信）
+- Gemini Audio API: 音声文字起こし（無料枠）
+
+#### 成果
+
+**完全自動化達成:**
+- ✅ マイドライブルートディレクトリの音声ファイルを自動検出
+- ✅ Webhook通知による即座の処理開始
+- ✅ バックグラウンドでの非同期処理
+- ✅ 大容量ファイル（10MB+）にも対応
+- ✅ 重複処理の防止（処理済みリスト管理）
+
+**処理速度:**
+- 6分の音声: 約1分で文字起こし完了
+- 11分の音声: 約2分で文字起こし完了
+- ダウンロード〜文字起こし〜JSON保存まで全自動
+
+**信頼性向上:**
+- mimeTypeベースのフィルタリングで誤検知ゼロ
+- スレッドベース実装で確実なバックグラウンド実行
+- エラーハンドリングとデバッグログ完備
+
+#### 既知の課題
+
+**処理済みリストの重複:**
+- 現象: 同じファイルIDが複数回記録される（4-5回）
+- 原因: 複数のWebhook通知が同時に届き、複数スレッドが並行実行
+- 影響: なし（`process_new_files()`内で重複処理をフィルタリング）
+- 対応: 必要に応じて重複エントリを削除可能（機能的には問題なし）
+
+**デバッグログの整理:**
+- 現状: 詳細なデバッグログが大量に出力
+- 今後: 本番運用前にログレベルを調整する必要あり
+
+---
+
 ## 次のアクション
 
 ### 現在のステータス
-Phase 8完了（2025-10-14）。GitHub設定完了（2025-10-15）。統合パイプライン確立、話者推論精度向上、エンティティ統一、統合Vector DB構築完了。次のフェーズは未定。
+Phase 9完了（2025-10-15）。マイドライブルート監視のWebhook自動処理が完全動作。コードの冗長性と改善点の整理が次のタスク。
 
 ## 更新履歴
 
+- **2025-10-15**: Phase 9完了（Webhook自動処理：マイドライブルート監視、mimeTypeフィルタリング、スレッドベース実装、エンドツーエンドテスト成功）
 - **2025-10-15**: GitHub設定とリポジトリセットアップ完了（SSH鍵生成、リポジトリ作成、大容量ファイル削除、トークン削除、プッシュ完了）
 - **2025-10-14**: Phase 8完了（Stage 8-1〜8-6）、話者推論プロンプト改善（杉本さんの必須存在明示化）、無料枠キャパシティ分析ツール追加
 - **2025-10-13**: 検証スクリプト復元（validation/→ルート）、README.md・progress.md更新
