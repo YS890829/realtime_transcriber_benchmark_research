@@ -421,6 +421,66 @@ curl "http://localhost:8000/setup?webhook_url=<ngrok-https-url>"
 - 音声ファイル形式（.m4a, .mp3, .wav）か確認
 - `.processed_drive_files.txt`に既にファイルIDが記録されていないか確認
 
+## Phase 10-1: 自動ファイル名変更機能（NEW）
+
+文字起こし内容に基づき、Gemini APIで最適なファイル名を自動生成します。
+
+### 機能概要
+
+- **自動ファイル名生成**: 要約・全文から会話のトピックを抽出
+- **日本語対応**: macOS/Windows互換の日本語ファイル名
+- **日付付与**: YYYYMMDD形式で日付を自動追加
+- **一括リネーム**: 音声ファイル + JSON等の関連ファイルを同時にリネーム
+- **Google Drive同期**: ローカル＋クラウド両方でリネーム
+
+### セットアップ
+
+```bash
+# .env に以下を追加
+GEMINI_API_KEY_FREE=your_api_key_here
+AUTO_RENAME_FILES=true  # true で有効化
+```
+
+### リネーム例
+
+**変更前**:
+```
+downloads/temp_1a2b3c4d5e.m4a
+downloads/temp_1a2b3c4d5e_structured.json
+```
+
+**変更後**:
+```
+downloads/20251015_営業ミーティング_Q4戦略.m4a
+downloads/20251015_営業ミーティング_Q4戦略_structured.json
+```
+
+Google Drive上のファイル名も同じ名前に変更されます。
+
+### スタンドアロン使用
+
+既存の音声ファイルを手動でリネームする場合:
+
+```bash
+python generate_smart_filename.py downloads/your_file.m4a
+```
+
+**前提条件**: `your_file_structured.json` が既に存在すること
+
+### 環境変数
+
+| 変数 | デフォルト | 説明 |
+|------|----------|------|
+| `AUTO_RENAME_FILES` | `false` | `true`で自動リネーム有効化 |
+| `GEMINI_API_KEY_FREE` | - | Gemini API無料枠キー（必須） |
+
+### 注意事項
+
+- ファイル名は20-30文字に制限されます
+- 特殊文字（`/\:*?"<>|`）は自動除去されます
+- 同名ファイルが存在する場合はタイムスタンプが追加されます
+- リネーム失敗時も文字起こし結果は保存されます
+
 ## 今後の拡張候補
 
 MVPで不便を感じた場合のみ追加:

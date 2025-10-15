@@ -577,6 +577,29 @@ def main():
             duration = structured_data['metadata']['file']['duration_seconds']
             print(f"  音声長: {duration:.1f}秒 ({duration/60:.1f}分)")
 
+        # [Phase 10-1] 自動ファイル名変更
+        if os.getenv('AUTO_RENAME_FILES', 'false').lower() == 'true':
+            try:
+                from generate_smart_filename import (
+                    generate_filename_from_transcription,
+                    rename_local_files
+                )
+
+                print("\n📝 最適なファイル名を生成中...")
+                new_name = generate_filename_from_transcription(json_path)
+                print(f"✨ 提案ファイル名: {new_name}")
+
+                # ローカルファイルリネーム
+                rename_map = rename_local_files(audio_path, new_name)
+
+                # パス更新（統計表示後なので不要だが、将来の拡張のため）
+                audio_path = str(rename_map[Path(audio_path)])
+                json_path = str(rename_map[Path(json_path)])
+
+            except Exception as e:
+                print(f"⚠️  自動リネーム失敗: {e}")
+                print("  文字起こし結果は保存されています")
+
         print("\n🎉 完了!")
 
     except Exception as e:

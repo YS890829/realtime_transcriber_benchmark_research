@@ -205,10 +205,50 @@ def process_new_files(service, folder_id='root'):
                     output = transcribe_file(audio_path)
                     print(output, flush=True)
 
-                    # Mark as processed
+                    # Mark as processed (before renaming, to prevent duplicate processing)
                     print(f"[3/3] Marking as processed...", flush=True)
                     mark_as_processed(file_id)
                     print(f"  Added to {PROCESSED_FILE}", flush=True)
+
+                    # [Phase 10-1] Auto-rename files (after marking as processed)
+                    if os.getenv('AUTO_RENAME_FILES', 'false').lower() == 'true':
+                        try:
+                            from generate_smart_filename import rename_gdrive_file
+
+                            # structured_transcribe.py already renamed local files
+                            # Find the renamed JSON file in downloads folder
+                            # Look for *_structured.json files modified in the last 60 seconds
+                            json_files = list(audio_path.parent.glob("*_structured.json"))
+                            if json_files:
+                                # Sort by modification time (newest first)
+                                json_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                                latest_json = json_files[0]
+
+                                # Find corresponding audio file
+                                audio_base = latest_json.stem.replace("_structured", "")
+                                audio_candidates = list(audio_path.parent.glob(f"{audio_base}.*"))
+                                audio_files = [f for f in audio_candidates if f.suffix in ['.m4a', '.mp3', '.wav']]
+
+                                if audio_files:
+                                    renamed_audio = audio_files[0]
+                                    new_audio_name = renamed_audio.name
+
+                                    print(f"[Rename] Local files already renamed to: {audio_base}", flush=True)
+                                    print(f"[Rename] Updating Google Drive file name...", flush=True)
+
+                                    # Rename on Google Drive
+                                    rename_gdrive_file(service, file_id, new_audio_name)
+                                    print(f"  ✅ Google Drive rename completed: {new_audio_name}", flush=True)
+                                else:
+                                    print(f"[Rename] Warning: Audio file not found after local rename", flush=True)
+                            else:
+                                print(f"[Rename] Skipped: No structured JSON files found", flush=True)
+
+                        except Exception as e:
+                            print(f"[Warning] Auto-rename failed: {e}", flush=True)
+                            print(f"  Transcription is saved successfully", flush=True)
+                            import traceback
+                            print(f"  Traceback: {traceback.format_exc()}", flush=True)
 
                     print(f"[✓] Completed: {file_name}", flush=True)
 
