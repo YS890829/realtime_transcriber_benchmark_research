@@ -48,3 +48,11 @@ monitor_error.log
 
 # Personal documents
 *.pdf
+
+# Audio files (test recordings)
+*.m4a
+*.mp3
+*.wav
+
+# Model files (whisper, etc.)
+archive_phase1_local_whisper/models/
