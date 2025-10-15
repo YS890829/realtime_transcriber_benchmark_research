@@ -145,7 +145,7 @@ flowchart LR
         C1 --> C2[トピック抽出<br/>id, name, keywords]
         C1 --> C3[エンティティ抽出<br/>people/orgs/dates]
         C2 --> C4[セグメント割当<br/>キーワードマッチ]
-        C3 --> C5[_enhanced.json<br/>topics[]<br/>entities{}]
+        C3 --> C5[_enhanced.json<br/>topics<br/>entities]
         C4 --> C5
     end
 
