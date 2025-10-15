@@ -349,10 +349,9 @@ def transcribe_audio_with_gemini(file_path):
 
 def summarize_text(text):
     """
-    Gemini APIでテキストを要約
+    Gemini APIでテキストを要約（詳細ログ付き）
     """
     genai.configure(api_key=GEMINI_API_KEY)
-    # Use Gemini 2.5 Flash
     model = genai.GenerativeModel("gemini-2.5-flash")
 
     prompt = f"""以下の文字起こしテキストを要約してください。
@@ -366,8 +365,59 @@ def summarize_text(text):
 {text}
 """
 
-    response = model.generate_content(prompt)
-    return response.text
+    # ログ: 要約リクエスト情報
+    print(f"  [要約API] テキスト長: {len(text)}文字", flush=True)
+    print(f"  [要約API] プロンプト長: {len(prompt)}文字", flush=True)
+    print(f"  [要約API] API呼び出し開始...", flush=True)
+
+    try:
+        response = model.generate_content(prompt)
+
+        # ログ: レスポンス詳細
+        print(f"  [要約API] API呼び出し完了", flush=True)
+        print(f"  [要約API] Response type: {type(response)}", flush=True)
+
+        if hasattr(response, 'candidates'):
+            candidates_count = len(response.candidates) if response.candidates else 0
+            print(f"  [要約API] Candidates count: {candidates_count}", flush=True)
+
+            if not response.candidates or candidates_count == 0:
+                print(f"  [要約API] ❌ エラー: response.candidates is empty", flush=True)
+
+                # prompt_feedbackを確認
+                if hasattr(response, 'prompt_feedback'):
+                    feedback = response.prompt_feedback
+                    print(f"  [要約API] prompt_feedback: {feedback}", flush=True)
+
+                    if hasattr(feedback, 'block_reason'):
+                        print(f"  [要約API] block_reason: {feedback.block_reason}", flush=True)
+
+                    if hasattr(feedback, 'safety_ratings'):
+                        print(f"  [要約API] safety_ratings:", flush=True)
+                        for rating in feedback.safety_ratings:
+                            print(f"    - {rating}", flush=True)
+
+                raise ValueError(f"Response blocked: candidates is empty. prompt_feedback={feedback if hasattr(response, 'prompt_feedback') else 'N/A'}")
+
+            # 正常な場合のログ
+            candidate = response.candidates[0]
+            print(f"  [要約API] finish_reason: {candidate.finish_reason if hasattr(candidate, 'finish_reason') else 'N/A'}", flush=True)
+
+            if hasattr(candidate, 'safety_ratings'):
+                print(f"  [要約API] safety_ratings:", flush=True)
+                for rating in candidate.safety_ratings:
+                    print(f"    - {rating}", flush=True)
+
+            print(f"  [要約API] ✅ 要約生成成功 (長さ: {len(response.text)}文字)", flush=True)
+
+        return response.text
+
+    except Exception as e:
+        print(f"  [要約API] ❌ Exception: {type(e).__name__}: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        raise
+
 
 
 def extract_file_metadata(audio_path):

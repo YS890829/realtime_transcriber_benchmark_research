@@ -134,11 +134,21 @@ def transcribe_file(audio_path):
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 
+    # Always log subprocess output for debugging (flush=True for thread safety)
+    print(f"[Debug] Transcription subprocess completed", flush=True)
+    print(f"[Debug] Exit code: {result.returncode}", flush=True)
+
+    if result.stdout:
+        print(f"[Debug] STDOUT:\n{result.stdout}", flush=True)
+
+    if result.stderr:
+        print(f"[Debug] STDERR:\n{result.stderr}", flush=True)
+
     if result.returncode != 0:
         error_msg = f"Transcription failed with exit code {result.returncode}\n"
         error_msg += f"STDERR: {result.stderr}\n"
         error_msg += f"STDOUT: {result.stdout}"
-        print(f"[Error] {error_msg}")
+        print(f"[Error] {error_msg}", flush=True)
         raise Exception(error_msg)
 
     return result.stdout
@@ -146,13 +156,13 @@ def transcribe_file(audio_path):
 
 def process_new_files(service, folder_id='root'):
     """Process new audio files in My Drive root"""
-    print(f"[Debug] process_new_files called with folder_id={folder_id}")
+    print(f"[Debug] process_new_files called with folder_id={folder_id}", flush=True)
     processed_files = get_processed_files()
-    print(f"[Debug] Loaded {len(processed_files)} processed files")
+    print(f"[Debug] Loaded {len(processed_files)} processed files", flush=True)
 
     # Get all audio files in My Drive root
     query = f"'{folder_id}' in parents and mimeType contains 'audio/' and trashed=false"
-    print(f"[Debug] Query: {query}")
+    print(f"[Debug] Query: {query}", flush=True)
     results = service.files().list(
         q=query,
         spaces='drive',
@@ -161,15 +171,15 @@ def process_new_files(service, folder_id='root'):
     ).execute()
 
     audio_files = results.get('files', [])
-    print(f"[Debug] Found {len(audio_files)} total audio files")
+    print(f"[Debug] Found {len(audio_files)} total audio files", flush=True)
     new_files = [f for f in audio_files if f['id'] not in processed_files]
-    print(f"[Debug] Found {len(new_files)} new files after filtering")
+    print(f"[Debug] Found {len(new_files)} new files after filtering", flush=True)
 
     if not new_files:
-        print("[Debug] No new files to process, returning")
+        print("[Debug] No new files to process, returning", flush=True)
         return
 
-    print(f"\n[Webhook] Found {len(new_files)} new file(s)")
+    print(f"\n[Webhook] Found {len(new_files)} new file(s)", flush=True)
 
     for file_info in new_files:
         file_id = file_info['id']
@@ -182,33 +192,33 @@ def process_new_files(service, folder_id='root'):
         try:
             # Try to acquire lock (non-blocking with 0.1s timeout)
             with lock.acquire(timeout=0.1):
-                print(f"\n[Processing] {file_name} (ID: {file_id})")
+                print(f"\n[Processing] {file_name} (ID: {file_id})", flush=True)
 
                 try:
                     # Download
-                    print(f"[1/3] Downloading...")
+                    print(f"[1/3] Downloading...", flush=True)
                     audio_path = download_file(service, file_id, file_name)
-                    print(f"  Saved to: {audio_path}")
+                    print(f"  Saved to: {audio_path}", flush=True)
 
                     # Transcribe
-                    print(f"[2/3] Transcribing and summarizing...")
+                    print(f"[2/3] Transcribing and summarizing...", flush=True)
                     output = transcribe_file(audio_path)
-                    print(output)
+                    print(output, flush=True)
 
                     # Mark as processed
-                    print(f"[3/3] Marking as processed...")
+                    print(f"[3/3] Marking as processed...", flush=True)
                     mark_as_processed(file_id)
-                    print(f"  Added to {PROCESSED_FILE}")
+                    print(f"  Added to {PROCESSED_FILE}", flush=True)
 
-                    print(f"[✓] Completed: {file_name}")
+                    print(f"[✓] Completed: {file_name}", flush=True)
 
                 except Exception as e:
-                    print(f"[✗] Error processing {file_name}: {e}")
+                    print(f"[✗] Error processing {file_name}: {e}", flush=True)
                     continue
 
         except Timeout:
             # Another thread is already processing this file
-            print(f"[Skip] {file_name} is being processed by another thread")
+            print(f"[Skip] {file_name} is being processed by another thread", flush=True)
             continue
 
 
@@ -280,21 +290,21 @@ async def receive_webhook(request: Request):
 def check_for_changes_sync():
     """Check for changes and process new files (synchronous version for threading)"""
     try:
-        print("[Webhook] Checking for changes...")
-        print("[Debug] Getting Drive service...")
+        print("[Webhook] Checking for changes...", flush=True)
+        print("[Debug] Getting Drive service...", flush=True)
         service = get_drive_service()
-        print("[Debug] Got Drive service successfully")
+        print("[Debug] Got Drive service successfully", flush=True)
 
         folder_id = get_root_folder_id()
-        print(f"[Debug] Folder ID: {folder_id}")
+        print(f"[Debug] Folder ID: {folder_id}", flush=True)
 
         # Process new files
-        print("[Debug] Calling process_new_files...")
+        print("[Debug] Calling process_new_files...", flush=True)
         process_new_files(service, folder_id)
-        print("[Debug] process_new_files completed")
+        print("[Debug] process_new_files completed", flush=True)
 
     except Exception as e:
-        print(f"[Error] Exception in check_for_changes: {e}")
+        print(f"[Error] Exception in check_for_changes: {e}", flush=True)
         import traceback
         traceback.print_exc()
 
