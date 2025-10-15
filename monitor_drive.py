@@ -13,14 +13,17 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
-# Constants
-SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
-TOKEN_PATH = 'token.json'
-PROCESSED_FILE = '.processed_drive_files.txt'
-POLL_INTERVAL = 300  # 5 minutes (300 seconds)
-DOWNLOAD_DIR = Path('downloads')  # Local download directory (same as drive_download.py)
+# Constants from environment variables
+SCOPES = [os.getenv('GOOGLE_DRIVE_SCOPES', 'https://www.googleapis.com/auth/drive.readonly')]
+TOKEN_PATH = os.getenv('TOKEN_PATH', 'token.json')
+PROCESSED_FILE = os.getenv('PROCESSED_FILE', '.processed_drive_files.txt')
+POLL_INTERVAL = int(os.getenv('POLL_INTERVAL', '300'))  # 5 minutes (300 seconds)
+DOWNLOAD_DIR = Path(os.getenv('DOWNLOAD_DIR', 'downloads'))  # Local download directory
 
 
 def get_drive_service():
@@ -57,9 +60,11 @@ def get_processed_files():
 
 
 def mark_as_processed(file_id):
-    """append file ID to .processed_drive_files.txt"""
-    with open(PROCESSED_FILE, 'a') as f:
-        f.write(f"{file_id}\n")
+    """append file ID to .processed_drive_files.txt (with duplicate check)"""
+    processed = get_processed_files()
+    if file_id not in processed:
+        with open(PROCESSED_FILE, 'a') as f:
+            f.write(f"{file_id}\n")
 
 
 def list_audio_files(service, folder_id='root'):

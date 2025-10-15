@@ -8,26 +8,29 @@ Monitors My Drive root for audio files
 import os
 import subprocess
 from pathlib import Path
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import FastAPI, Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
 import json
 from datetime import datetime, timedelta
-import asyncio
 import threading
+from dotenv import load_dotenv
 
-# Constants
-SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
-TOKEN_PATH = 'token.json'
-PROCESSED_FILE = '.processed_drive_files.txt'
-DOWNLOAD_DIR = Path('downloads')
+# Load environment variables
+load_dotenv()
+
+# Constants from environment variables
+SCOPES = [os.getenv('GOOGLE_DRIVE_SCOPES', 'https://www.googleapis.com/auth/drive.readonly')]
+TOKEN_PATH = os.getenv('TOKEN_PATH', 'token.json')
+PROCESSED_FILE = os.getenv('PROCESSED_FILE', '.processed_drive_files.txt')
+DOWNLOAD_DIR = Path(os.getenv('DOWNLOAD_DIR', 'downloads'))
 PAGE_TOKEN_FILE = '.start_page_token.txt'
 CHANNEL_FILE = '.channel_info.json'
 
 # Webhook notification channel will expire after this duration
-CHANNEL_EXPIRATION_HOURS = 24
+CHANNEL_EXPIRATION_HOURS = int(os.getenv('CHANNEL_EXPIRATION_HOURS', '24'))
 
 
 def get_drive_service():
@@ -77,9 +80,11 @@ def get_processed_files():
 
 
 def mark_as_processed(file_id):
-    """Mark file as processed"""
-    with open(PROCESSED_FILE, 'a') as f:
-        f.write(f"{file_id}\n")
+    """Mark file as processed (with duplicate check)"""
+    processed = get_processed_files()
+    if file_id not in processed:
+        with open(PROCESSED_FILE, 'a') as f:
+            f.write(f"{file_id}\n")
 
 
 def download_file(service, file_id, file_name):
@@ -206,7 +211,7 @@ app = FastAPI()
 
 
 @app.post("/webhook")
-async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
+async def receive_webhook(request: Request):
     """Receive webhook notifications from Google Drive"""
     headers = dict(request.headers)
 
@@ -255,11 +260,6 @@ def check_for_changes_sync():
         print(f"[Error] Exception in check_for_changes: {e}")
         import traceback
         traceback.print_exc()
-
-
-async def check_for_changes():
-    """Check for changes and process new files (async version - not used currently)"""
-    check_for_changes_sync()
 
 
 @app.on_event("startup")

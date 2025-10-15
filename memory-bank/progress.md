@@ -999,13 +999,106 @@ Phase 7検証スクリプトはプロジェクトのコア機能として重要�
 
 ---
 
+### ✅ Phase 9.5: コードリファクタリング（冗長性削除と設定管理改善）
+
+**目標**: コードの保守性向上、冗長性削除、設定管理の改善
+
+**完了日**: 2025-10-15
+
+#### 実施内容
+
+**1. 処理済みリストの重複排除:**
+- 問題: `.processed_drive_files.txt`に同じファイルIDが複数回記録（14行中8行が重複）
+- 原因: 複数のWebhook通知による並行処理
+- 解決:
+  - `sort -u`コマンドで重複を削除（14行 → 6行に削減）
+  - `mark_as_processed()`関数に重複チェックロジック追加
+  ```python
+  def mark_as_processed(file_id):
+      """Mark file as processed (with duplicate check)"""
+      processed = get_processed_files()
+      if file_id not in processed:
+          with open(PROCESSED_FILE, 'a') as f:
+              f.write(f"{file_id}\n")
+  ```
+- 効果: ファイルサイズ削減、今後の重複を防止
+
+**2. 未使用コードの削除:**
+- 削除対象:
+  - `webhook_server.py`の`check_for_changes()` async関数（使用されていない）
+  - 不要なimport: `asyncio`
+  - `BackgroundTasks`のimport（`receive_webhook()`関数から削除）
+- 効果: コードのクリーンアップ、可読性向上
+
+**3. 設定ファイルの導入（.env）:**
+- 作成ファイル:
+  - `.env`: 実際の設定値（Gitignore対象）
+  - `.env.example`: テンプレート（Gitコミット対象）
+- 移行した定数:
+  ```env
+  # Google Drive API設定
+  GOOGLE_DRIVE_SCOPES=https://www.googleapis.com/auth/drive.readonly
+  CREDENTIALS_FILE=credentials.json
+  TOKEN_PATH=token.json
+
+  # ファイル管理
+  PROCESSED_FILE=.processed_drive_files.txt
+  DOWNLOAD_DIR=downloads
+
+  # Webhook設定（時間単位）
+  CHANNEL_EXPIRATION_HOURS=24
+
+  # ポーリング設定（秒単位）
+  POLL_INTERVAL=300
+  ```
+- 修正ファイル:
+  - `webhook_server.py`: `python-dotenv`で`.env`読み込み
+  - `monitor_drive.py`: 同上
+  - `drive_download.py`: 同上
+- 効果:
+  - 環境ごとの設定変更が容易
+  - ハードコードされた定数を排除
+  - 設定の一元管理
+
+#### 技術スタック
+
+**使用ツール:**
+- `sort -u`: 重複削除
+- `python-dotenv`: 環境変数管理（既にrequirements.txtに含まれていた）
+
+**修正内容:**
+- `webhook_server.py`: 18行削除、20行追加（.envサポート、未使用コード削除、重複チェック）
+- `monitor_drive.py`: 9行削除、14行追加（.envサポート、重複チェック）
+- `drive_download.py`: 6行削除、10行追加（.envサポート）
+- `.processed_drive_files.txt`: 14行 → 6行（重複削除）
+
+#### 成果
+
+**コード品質向上:**
+- ✅ 未使用コード削除（async関数、不要なimport）
+- ✅ 重複コード削減（重複チェックロジックの統一）
+- ✅ 設定管理の改善（.envファイル導入）
+
+**保守性向上:**
+- ✅ 環境変数で設定を一元管理
+- ✅ `.env.example`でテンプレート提供
+- ✅ 処理済みリストの重複防止
+
+**テスト結果:**
+- ✅ `webhook_server.py`: インポート成功、環境変数読み込み確認
+- ✅ `monitor_drive.py`: インポート成功、環境変数読み込み確認
+- ✅ `drive_download.py`: インポート成功、環境変数読み込み確認
+
+---
+
 ## 次のアクション
 
 ### 現在のステータス
-Phase 9完了（2025-10-15）。マイドライブルート監視のWebhook自動処理が完全動作。コードの冗長性と改善点の整理が次のタスク。
+Phase 9.5完了（2025-10-15）。コードリファクタリング完了（冗長性削除、設定管理改善）。次のフェーズは未定。
 
 ## 更新履歴
 
+- **2025-10-15**: Phase 9.5完了（コードリファクタリング：処理済みリスト重複削除、未使用コード削除、.env設定管理導入）
 - **2025-10-15**: Phase 9完了（Webhook自動処理：マイドライブルート監視、mimeTypeフィルタリング、スレッドベース実装、エンドツーエンドテスト成功）
 - **2025-10-15**: GitHub設定とリポジトリセットアップ完了（SSH鍵生成、リポジトリ作成、大容量ファイル削除、トークン削除、プッシュ完了）
 - **2025-10-14**: Phase 8完了（Stage 8-1〜8-6）、話者推論プロンプト改善（杉本さんの必須存在明示化）、無料枠キャパシティ分析ツール追加

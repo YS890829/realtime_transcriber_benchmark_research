@@ -21,16 +21,20 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
 import subprocess
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Google Drive API スコープ（読み取り専用）
-SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+SCOPES = [os.getenv('GOOGLE_DRIVE_SCOPES', 'https://www.googleapis.com/auth/drive.readonly')]
 
 # 認証ファイル
-CREDENTIALS_FILE = 'credentials.json'
-TOKEN_FILE = 'token.json'
+CREDENTIALS_FILE = os.getenv('CREDENTIALS_FILE', 'credentials.json')
+TOKEN_FILE = os.getenv('TOKEN_PATH', 'token.json')
 
 # ダウンロード先フォルダ
-DOWNLOAD_DIR = Path(__file__).parent / 'downloads'
+DOWNLOAD_DIR = Path(os.getenv('DOWNLOAD_DIR', str(Path(__file__).parent / 'downloads')))
 
 
 def authenticate_drive():
