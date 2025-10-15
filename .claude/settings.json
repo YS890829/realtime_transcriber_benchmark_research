@@ -1,5 +1,6 @@
 {
   "defaultMode": "acceptEdits",
+  "memoryBankPath": "memory-bank/progress.md",
   "permissions": {
     "allow": [
       "Read",

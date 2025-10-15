@@ -17,6 +17,8 @@ import json
 from datetime import datetime, timedelta
 import threading
 from dotenv import load_dotenv
+from filelock import FileLock, Timeout
+import time
 
 # Load environment variables
 load_dotenv()
@@ -29,8 +31,27 @@ DOWNLOAD_DIR = Path(os.getenv('DOWNLOAD_DIR', 'downloads'))
 PAGE_TOKEN_FILE = '.start_page_token.txt'
 CHANNEL_FILE = '.channel_info.json'
 
+# Lock directory for preventing duplicate processing
+LOCK_DIR = Path('.processing_locks')
+LOCK_DIR.mkdir(exist_ok=True)
+
 # Webhook notification channel will expire after this duration
 CHANNEL_EXPIRATION_HOURS = int(os.getenv('CHANNEL_EXPIRATION_HOURS', '24'))
+
+
+def cleanup_old_locks():
+    """Remove stale lock files on startup (handles abnormal termination cases)"""
+    current_time = time.time()
+    stale_threshold = 1800  # 30 minutes in seconds
+
+    for lock_file in LOCK_DIR.glob('*.lock'):
+        try:
+            # Check if lock file is older than threshold
+            if current_time - lock_file.stat().st_mtime > stale_threshold:
+                print(f"[Cleanup] Removing stale lock: {lock_file.name}")
+                lock_file.unlink(missing_ok=True)
+        except Exception as e:
+            print(f"[Warning] Failed to clean up {lock_file.name}: {e}")
 
 
 def get_drive_service():
@@ -114,7 +135,11 @@ def transcribe_file(audio_path):
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        raise Exception(f"Transcription failed: {result.stderr}")
+        error_msg = f"Transcription failed with exit code {result.returncode}\n"
+        error_msg += f"STDERR: {result.stderr}\n"
+        error_msg += f"STDOUT: {result.stdout}"
+        print(f"[Error] {error_msg}")
+        raise Exception(error_msg)
 
     return result.stdout
 
@@ -150,28 +175,40 @@ def process_new_files(service, folder_id='root'):
         file_id = file_info['id']
         file_name = file_info['name']
 
-        print(f"\n[Processing] {file_name} (ID: {file_id})")
+        # Lock file path for this specific file
+        lock_path = LOCK_DIR / f"{file_id}.lock"
+        lock = FileLock(lock_path, timeout=1)
 
         try:
-            # Download
-            print(f"[1/3] Downloading...")
-            audio_path = download_file(service, file_id, file_name)
-            print(f"  Saved to: {audio_path}")
+            # Try to acquire lock (non-blocking with 0.1s timeout)
+            with lock.acquire(timeout=0.1):
+                print(f"\n[Processing] {file_name} (ID: {file_id})")
 
-            # Transcribe
-            print(f"[2/3] Transcribing and summarizing...")
-            output = transcribe_file(audio_path)
-            print(output)
+                try:
+                    # Download
+                    print(f"[1/3] Downloading...")
+                    audio_path = download_file(service, file_id, file_name)
+                    print(f"  Saved to: {audio_path}")
 
-            # Mark as processed
-            print(f"[3/3] Marking as processed...")
-            mark_as_processed(file_id)
-            print(f"  Added to {PROCESSED_FILE}")
+                    # Transcribe
+                    print(f"[2/3] Transcribing and summarizing...")
+                    output = transcribe_file(audio_path)
+                    print(output)
 
-            print(f"[✓] Completed: {file_name}")
+                    # Mark as processed
+                    print(f"[3/3] Marking as processed...")
+                    mark_as_processed(file_id)
+                    print(f"  Added to {PROCESSED_FILE}")
 
-        except Exception as e:
-            print(f"[✗] Error processing {file_name}: {e}")
+                    print(f"[✓] Completed: {file_name}")
+
+                except Exception as e:
+                    print(f"[✗] Error processing {file_name}: {e}")
+                    continue
+
+        except Timeout:
+            # Another thread is already processing this file
+            print(f"[Skip] {file_name} is being processed by another thread")
             continue
 
 
@@ -270,6 +307,10 @@ async def startup_event():
     print("=" * 60)
     print(f"Monitoring: My Drive root (audio files only)")
     print("Detection method: Real-time Push notifications\n")
+
+    # Clean up old lock files from previous runs
+    print("[Startup] Cleaning up stale lock files...")
+    cleanup_old_locks()
 
     # Note: Webhook URL needs to be set manually after ngrok starts
     print("[Info] Webhook setup will be done manually after getting ngrok URL")

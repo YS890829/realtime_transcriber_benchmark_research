@@ -464,52 +464,64 @@ def main():
         print(f"❌ エラー: ファイルが見つかりません: {audio_path}")
         sys.exit(1)
 
-    print(f"🎙️ 構造化文字起こし開始: {audio_path}")
-    print("[1/3] 文字起こし中（Gemini Audio API + 話者識別）...")
+    try:
+        print(f"🎙️ 構造化文字起こし開始: {audio_path}")
+        print("[1/3] 文字起こし中（Gemini Audio API + 話者識別）...")
 
-    # 文字起こし実行（Gemini Audio API）
-    transcription_result = transcribe_audio_with_gemini(audio_path)
+        # 文字起こし実行（Gemini Audio API）
+        transcription_result = transcribe_audio_with_gemini(audio_path)
 
-    print("[2/3] 要約生成中...")
+        # セグメントが取得できなかった場合はエラー
+        if not transcription_result.get("segments"):
+            print(f"❌ エラー: 文字起こしに失敗しました（セグメントが空です）", file=sys.stderr)
+            sys.exit(1)
 
-    # 要約生成
-    summary = summarize_text(transcription_result["text"])
+        print("[2/3] 要約生成中...")
 
-    print("[3/3] JSON構造化中...")
+        # 要約生成
+        summary = summarize_text(transcription_result["text"])
 
-    # 構造化JSON生成
-    structured_data = create_structured_json(audio_path, transcription_result, summary)
+        print("[3/3] JSON構造化中...")
 
-    # 出力ファイル名を生成
-    base_path = audio_path.rsplit(".", 1)[0]
-    json_path = base_path + "_structured.json"
+        # 構造化JSON生成
+        structured_data = create_structured_json(audio_path, transcription_result, summary)
 
-    # JSON保存
-    save_json(structured_data, json_path)
+        # 出力ファイル名を生成
+        base_path = audio_path.rsplit(".", 1)[0]
+        json_path = base_path + "_structured.json"
 
-    # 統計情報表示
-    print("\n📊 処理統計:")
-    print(f"  文字数: {structured_data['metadata']['transcription']['char_count']}")
-    print(f"  単語数: {structured_data['metadata']['transcription']['word_count']}")
-    print(f"  セグメント数: {structured_data['metadata']['transcription']['segment_count']}")
+        # JSON保存
+        save_json(structured_data, json_path)
 
-    # 話者情報表示
-    if 'speakers' in structured_data and structured_data['speakers']:
-        print(f"  話者数: {len(structured_data['speakers'])}")
-        for speaker in structured_data['speakers']:
-            print(f"    - {speaker['id']}: {speaker['segment_count']}セグメント")
+        # 統計情報表示
+        print("\n📊 処理統計:")
+        print(f"  文字数: {structured_data['metadata']['transcription']['char_count']}")
+        print(f"  単語数: {structured_data['metadata']['transcription']['word_count']}")
+        print(f"  セグメント数: {structured_data['metadata']['transcription']['segment_count']}")
 
-    # Note: Word-level timestampsは非対応（Geminiの制約）
-    if structured_data['words']:
-        print(f"  単語タイムスタンプ数: {len(structured_data['words'])}")
-    else:
-        print(f"  単語タイムスタンプ: 非対応（Gemini API制約）")
+        # 話者情報表示
+        if 'speakers' in structured_data and structured_data['speakers']:
+            print(f"  話者数: {len(structured_data['speakers'])}")
+            for speaker in structured_data['speakers']:
+                print(f"    - {speaker['id']}: {speaker['segment_count']}セグメント")
 
-    if structured_data['metadata']['file']['duration_seconds']:
-        duration = structured_data['metadata']['file']['duration_seconds']
-        print(f"  音声長: {duration:.1f}秒 ({duration/60:.1f}分)")
+        # Note: Word-level timestampsは非対応（Geminiの制約）
+        if structured_data['words']:
+            print(f"  単語タイムスタンプ数: {len(structured_data['words'])}")
+        else:
+            print(f"  単語タイムスタンプ: 非対応（Gemini API制約）")
 
-    print("\n🎉 完了!")
+        if structured_data['metadata']['file']['duration_seconds']:
+            duration = structured_data['metadata']['file']['duration_seconds']
+            print(f"  音声長: {duration:.1f}秒 ({duration/60:.1f}分)")
+
+        print("\n🎉 完了!")
+
+    except Exception as e:
+        print(f"\n❌ エラー: 処理中に例外が発生しました: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
