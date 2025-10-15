@@ -210,45 +210,89 @@ def process_new_files(service, folder_id='root'):
                     mark_as_processed(file_id)
                     print(f"  Added to {PROCESSED_FILE}", flush=True)
 
-                    # [Phase 10-1] Auto-rename files (after marking as processed)
-                    if os.getenv('AUTO_RENAME_FILES', 'false').lower() == 'true':
-                        try:
-                            from generate_smart_filename import rename_gdrive_file
+                    # [Phase 10-1] Local rename is handled by structured_transcribe.py
+                    # [Phase 10-2] Google Drive file will be deleted, so no need to rename on cloud
 
-                            # structured_transcribe.py already renamed local files
-                            # Find the renamed JSON file in downloads folder
-                            # Look for *_structured.json files modified in the last 60 seconds
-                            json_files = list(audio_path.parent.glob("*_structured.json"))
-                            if json_files:
-                                # Sort by modification time (newest first)
-                                json_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-                                latest_json = json_files[0]
+                    # [Phase 10-2] Auto-delete cloud files (after transcription completed)
+                    # Always delete cloud files after successful transcription
+                    try:
+                        from cloud_file_manager import (
+                            SafeDeletionValidator,
+                            delete_gdrive_file,
+                            log_deletion,
+                            get_file_size_mb
+                        )
 
-                                # Find corresponding audio file
-                                audio_base = latest_json.stem.replace("_structured", "")
-                                audio_candidates = list(audio_path.parent.glob(f"{audio_base}.*"))
-                                audio_files = [f for f in audio_candidates if f.suffix in ['.m4a', '.mp3', '.wav']]
+                        # Find the most recent structured JSON file
+                        json_files = list(audio_path.parent.glob("*_structured.json"))
+                        if json_files:
+                            # Sort by modification time (newest first)
+                            json_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                            latest_json = json_files[0]
 
-                                if audio_files:
-                                    renamed_audio = audio_files[0]
-                                    new_audio_name = renamed_audio.name
+                            print(f"[Delete] Validating JSON integrity: {latest_json.name}", flush=True)
 
-                                    print(f"[Rename] Local files already renamed to: {audio_base}", flush=True)
-                                    print(f"[Rename] Updating Google Drive file name...", flush=True)
+                            # Validate JSON integrity before deletion
+                            validator = SafeDeletionValidator(latest_json)
+                            validation_passed = validator.validate()
+                            validation_results = validator.get_validation_details()
 
-                                    # Rename on Google Drive
-                                    rename_gdrive_file(service, file_id, new_audio_name)
-                                    print(f"  ✅ Google Drive rename completed: {new_audio_name}", flush=True)
-                                else:
-                                    print(f"[Rename] Warning: Audio file not found after local rename", flush=True)
+                            if validation_passed:
+                                print(f"[Delete] ✅ Validation passed, deleting cloud file...", flush=True)
+
+                                # Get file size for logging
+                                file_size_mb = get_file_size_mb(service, file_id)
+
+                                # Delete from Google Drive
+                                deleted = False
+                                error = None
+                                try:
+                                    delete_gdrive_file(service, file_id, file_name)
+                                    deleted = True
+                                    print(f"  ✅ Google Drive file deleted: {file_id}", flush=True)
+                                except Exception as delete_error:
+                                    error = str(delete_error)
+                                    print(f"  ❌ Deletion failed: {error}", flush=True)
+
+                                # Log deletion event
+                                log_deletion(
+                                    file_info={
+                                        'file_id': file_id,
+                                        'file_name': file_name,
+                                        'original_name': file_name,
+                                        'file_size_mb': file_size_mb,
+                                        'json_path': latest_json
+                                    },
+                                    validation_results=validation_results,
+                                    deleted=deleted,
+                                    error=error
+                                )
+
                             else:
-                                print(f"[Rename] Skipped: No structured JSON files found", flush=True)
+                                print(f"[Delete] ❌ Validation failed, keeping cloud file", flush=True)
+                                print(f"  Validation details: {validation_results}", flush=True)
 
-                        except Exception as e:
-                            print(f"[Warning] Auto-rename failed: {e}", flush=True)
-                            print(f"  Transcription is saved successfully", flush=True)
-                            import traceback
-                            print(f"  Traceback: {traceback.format_exc()}", flush=True)
+                                # Log failed validation
+                                log_deletion(
+                                    file_info={
+                                        'file_id': file_id,
+                                        'file_name': file_name,
+                                        'original_name': file_name,
+                                        'json_path': latest_json
+                                    },
+                                    validation_results=validation_results,
+                                    deleted=False,
+                                    error="Validation failed"
+                                )
+
+                        else:
+                            print(f"[Delete] Skipped: No structured JSON files found", flush=True)
+
+                    except Exception as e:
+                        print(f"[Warning] Auto-delete failed: {e}", flush=True)
+                        print(f"  Cloud file is preserved", flush=True)
+                        import traceback
+                        print(f"  Traceback: {traceback.format_exc()}", flush=True)
 
                     print(f"[✓] Completed: {file_name}", flush=True)
 

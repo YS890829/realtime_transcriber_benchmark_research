@@ -35,6 +35,9 @@ token.json
 downloads/
 .processed_drive_files.txt
 
+# Phase 10-2 (Cloud File Auto-deletion)
+.deletion_log.jsonl
+
 # Phase 5-3 (FastAPI + Push通知)
 .start_page_token.txt
 .channel_info.json

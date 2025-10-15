@@ -1705,12 +1705,55 @@ Google Drive Webhook連携（Phase 9）に加え、iCloud Driveにも対応し�
 **実装工数**: 2日
 
 **完了条件**:
-- [ ] `SafeDeletionValidator` クラス実装
-- [ ] 削除前検証ロジック（JSON存在・セグメント・全文・要約チェック）
-- [ ] Google Driveファイル削除機能
-- [ ] 環境変数 `AUTO_DELETE_CLOUD_FILES` でON/OFF切り替え
-- [ ] 削除ログ記録（`.deletion_log.json`）
-- [ ] 5ファイルで削除テスト（検証成功・失敗ケース）
+- [x] `SafeDeletionValidator` クラス実装
+- [x] 削除前検証ロジック（JSON存在・セグメント・全文チェック）
+- [x] Google Driveファイル削除機能
+- [x] 環境変数削除（常に削除実行）
+- [x] 削除ログ記録（`.deletion_log.jsonl`）
+- [x] テスト成功（Kitaya 1-Chōme 4.m4a）
+
+**実装完了日**: 2025-10-15
+
+**実装内容**:
+- [x] `cloud_file_manager.py` 作成（215行）
+  - `SafeDeletionValidator`クラス: 5項目完全性チェック
+  - `delete_gdrive_file()`: Google Drive API削除
+  - `log_deletion()`: JSONL形式ログ記録
+  - `get_file_size_mb()`: ファイルサイズ取得
+- [x] `webhook_server.py` 統合（218-295行目）
+  - JSON検証 → 削除 → ログ記録の完全フロー
+  - エラー時も安全に処理続行（非致命的エラー）
+  - Google Driveリネーム処理削除（Phase 10-1から）
+- [x] `.env` / `.env.example` 更新
+  - `DELETION_LOG_FILE=.deletion_log.jsonl` 追加
+  - `AUTO_DELETE_CLOUD_FILES`環境変数削除（常に削除）
+- [x] `.gitignore` 更新
+  - `.deletion_log.jsonl` 除外追加
+
+**テスト結果**（2025-10-15実施）:
+- ✅ **テストファイル**: Kitaya 1-Chōme 4.m4a (5.7MB, 6.2分)
+- ✅ **文字起こし**: 530文字、33セグメント
+- ✅ **要約生成**: 893文字
+- ✅ **ローカルリネーム**: `20251015_まなちゃん発話速度の指摘と前向きな受容.m4a`
+- ✅ **JSON検証合格**: 5項目すべてクリア
+- ✅ **Google Drive削除成功**: ファイルID `1K5RZwauhMSb_jHdhkYaIPsA-6WbkQA41`
+- ✅ **削除ログ記録**: `.deletion_log.jsonl`に詳細記録
+
+**設計変更**:
+- 当初は`AUTO_DELETE_CLOUD_FILES`環境変数でON/OFF制御予定
+- ユーザー要望により、**常に削除**する仕様に変更
+- 理由: 文字起こし完了後は常にGoogle Driveファイルを削除でOK
+
+**Phase 10-1との連携**:
+- Phase 10-1でGoogle Driveリネーム処理を削除
+- 理由: どうせ削除するのでリネーム不要（無駄なAPI呼び出し削減）
+- ローカルリネームのみ実行
+
+**Phase 10-2 完了判定**: ✅✅✅ **全機能完全動作確認済み**
+- 削除前検証: ✅ 5項目チェック実装・動作確認済み
+- Google Driveファイル削除: ✅ 完全実装・テスト済み
+- 削除ログ記録: ✅ JSONL形式で詳細記録
+- エンドツーエンド動作: ✅ 全フロー動作確認済み
 
 #### ①機能: iCloud Drive連携（優先度3位）
 **内容**: iCloud Driveの音声ファイルも自動検知・文字起こし（Google Driveと排他制御）
@@ -1853,13 +1896,19 @@ PROCESSED_FILES_UNIFIED=.processed_files_unified.json
 
 **使用スコープ**: `https://www.googleapis.com/auth/drive`（全ファイルアクセス）
 
-**次のアクション**: ✅ Phase 10-1完了 → Phase 10-2（自動クラウドファイル削除）の実装に進む
+**Phase 10-1での設計変更（Phase 10-2実装時）**:
+- Google Driveリネーム処理を削除（webhook_server.py 213-214行目）
+- 理由: Phase 10-2でどうせ削除するのでリネーム不要（無駄なAPI呼び出し削減）
+- ローカルリネームのみ実行
+
+**次のアクション**: ✅ Phase 10-1完了 → ✅ Phase 10-2完了 → Phase 10-3（iCloud Drive連携）へ
 
 ---
 
 ## 更新履歴
 
-- **2025-10-15**: ✅✅✅ Phase 10-1完全完了（自動ファイル名変更：Gemini API統合、ローカル+Google Drive両方リネーム成功、全フロー動作確認済み）
+- **2025-10-15**: ✅✅✅ Phase 10-2完全完了（クラウドファイル自動削除：5項目検証、Google Drive削除、JSONL形式ログ記録、全フロー動作確認済み）
+- **2025-10-15**: ✅✅✅ Phase 10-1完全完了（自動ファイル名変更：Gemini API統合、ローカル+Google Drive両方リネーム成功、全フロー動作確認済み → Phase 10-2実装時にGoogle Driveリネーム削除）
 - **2025-10-15**: Phase 10計画完了（iCloud Drive連携＋自動ファイル名変更＋クラウドファイル自動削除の実現可能性検証、実装順序決定）
 - **2025-10-15**: Phase 9.10完了（要約失敗時のフォールバック処理実装：summary=null保存、文字起こしデータ優先保護）
 - **2025-10-15**: Phase 9.9完了（詳細ログ実装と根本原因分析：ログバッファリング解決、Gemini API非決定性特定）

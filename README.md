@@ -481,6 +481,105 @@ python generate_smart_filename.py downloads/your_file.m4a
 - 同名ファイルが存在する場合はタイムスタンプが追加されます
 - リネーム失敗時も文字起こし結果は保存されます
 
+## Phase 10-2: クラウドファイル自動削除機能（NEW）
+
+文字起こし完了後、Google Driveの音声ファイルを自動削除してストレージを節約します。
+
+### 機能概要
+
+- **自動削除**: 文字起こし完了後、Google Driveファイルを自動削除
+- **安全検証**: 5項目のJSON完全性チェックで誤削除を防止
+- **ローカル保持**: ローカルファイルは削除せず保持
+- **削除ログ**: 全削除イベントを`.deletion_log.jsonl`に記録
+- **非致命的エラー**: 削除失敗時も処理は続行
+
+### 削除前検証（5項目）
+
+削除前に以下をチェックし、全て合格した場合のみ削除実行：
+
+1. ✅ JSONファイルが存在する
+2. ✅ ファイルサイズ > 0バイト
+3. ✅ JSONがパース可能
+4. ✅ `segments`配列が存在し、要素数 > 0
+5. ✅ `full_text`フィールドが存在し、長さ > 10文字
+6. ✅ `metadata`フィールドが存在
+
+### 処理フロー
+
+```
+1. Google Driveファイル検知
+2. ダウンロード
+3. 文字起こし（Gemini Audio API）
+4. ローカルファイルリネーム（Gemini 2.0 Flash）
+5. JSON検証（5項目チェック）
+   ✅ 検証合格 → Google Driveファイル削除 + ログ記録
+   ❌ 検証失敗 → Google Driveファイル保持 + エラーログ記録
+```
+
+### 削除ログ形式
+
+`.deletion_log.jsonl`（JSONL形式、1行=1イベント）:
+
+```json
+{
+  "timestamp": "2025-10-15T07:31:46+00:00",
+  "file_id": "1K5RZwauhMSb_jHdhkYaIPsA-6WbkQA41",
+  "file_name": "Kitaya 1-Chōme 4.m4a",
+  "json_path": "downloads/20251015_まなちゃん発話速度の指摘と前向きな受容_structured.json",
+  "validation_passed": true,
+  "validation_details": {
+    "segments_count": 33,
+    "full_text_length": 530,
+    "file_size_bytes": 9538
+  },
+  "deleted": true,
+  "error": null
+}
+```
+
+### 環境変数
+
+| 変数 | デフォルト | 説明 |
+|------|----------|------|
+| `DELETION_LOG_FILE` | `.deletion_log.jsonl` | 削除ログファイルのパス |
+
+### スタンドアロンテスト
+
+既存のJSONファイルの検証テスト:
+
+```bash
+python cloud_file_manager.py downloads/your_file_structured.json
+```
+
+**出力例**:
+```
+✅ Validation PASSED
+{
+  "file_exists": true,
+  "segments_count": 33,
+  "full_text_length": 530,
+  ...
+}
+```
+
+### 注意事項
+
+- **常に削除**: 文字起こし完了後は常にGoogle Driveファイルを削除します
+- **ローカル保持**: ローカルファイル（音声+JSON）は削除されません
+- **検証失敗時**: JSON検証が失敗した場合、安全のため削除しません
+- **復元**: 削除後の復元は不可（ログから削除履歴のみ確認可能）
+- **Google Drive権限**: `drive`スコープ（全ファイルアクセス）が必要
+
+### Phase 10-1との連携
+
+Phase 10-1（自動リネーム）とPhase 10-2（自動削除）は同時に動作します：
+
+1. 文字起こし完了
+2. **Phase 10-1**: ローカルファイルをリネーム（Google Driveはリネームしない）
+3. **Phase 10-2**: JSON検証後、Google Driveファイルを削除
+
+**理由**: どうせ削除するので、Google Drive上のファイル名変更は不要
+
 ## 今後の拡張候補
 
 MVPで不便を感じた場合のみ追加:
