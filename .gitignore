@@ -44,8 +44,9 @@ downloads/
 chroma_db/
 
 # Logs
-monitor.log
-monitor_error.log
+*.log
+*.pid
+*.backup
 
 # Personal documents
 *.pdf
