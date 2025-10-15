@@ -1560,8 +1560,113 @@ Kitaya 2処理失敗の根本原因を特定するため、詳細ログを実装
 - ✅ 根本原因特定（Gemini API非決定性）
 - ✅ 今後のデバッグ効率化
 
+---
+
+## Phase 9.10: 要約失敗時のフォールバック処理実装
+
+### 背景
+Phase 9.9で特定したGemini API非決定性により、要約生成が間欠的に失敗（PROHIBITED_CONTENT）するケースが発生。文字起こしは成功しているのに要約失敗でJSON全体が保存されない問題を解決する必要があった。
+
+### 実装内容
+
+#### 1. summarize_text()の例外処理改善
+**ファイル**: [structured_transcribe.py](../structured_transcribe.py#L350-L422)
+
+**変更点**:
+- 例外発生時に`raise`で中断せず、`None`を返すように変更
+- `response.candidates`が空の場合も`None`を返す
+- フォールバック発生時の警告メッセージ追加
+
+```python
+def summarize_text(text):
+    """
+    Gemini APIでテキストを要約（詳細ログ付き）
+    失敗時はNoneを返す（例外を上げない）
+    """
+    try:
+        response = model.generate_content(prompt)
+
+        if not response.candidates or candidates_count == 0:
+            print(f"  [要約API] ⚠️  要約生成失敗（フォールバック: summary=null）", flush=True)
+            return None
+
+        # 正常処理...
+        return response.text
+
+    except Exception as e:
+        print(f"  [要約API] ❌ Exception: {type(e).__name__}: {e}", flush=True)
+        print(f"  [要約API] ⚠️  要約生成失敗（フォールバック: summary=null）", flush=True)
+        return None
+```
+
+#### 2. main()のフォールバック処理追加
+**ファイル**: [structured_transcribe.py](../structured_transcribe.py#L532-L543)
+
+**変更点**:
+- `summary`が`None`の場合の警告メッセージ追加
+- `create_structured_json()`に`None`を渡してもエラーにならない
+- JSONには`"summary": null`として保存される
+
+```python
+# 要約生成（失敗時はNone）
+summary = summarize_text(transcription_result["text"])
+
+if summary is None:
+    print("  ⚠️  要約生成に失敗しましたが、文字起こし結果は保存されます（summary: null）", flush=True)
+
+# 構造化JSON生成（summaryがNoneでも問題なし）
+structured_data = create_structured_json(audio_path, transcription_result, summary)
+```
+
+#### 3. 統計表示の改善
+**ファイル**: [structured_transcribe.py](../structured_transcribe.py#L558-L562)
+
+**追加内容**:
+- 要約状態（生成済み/null）の表示追加
+
+```python
+# 要約状態表示
+if structured_data['summary']:
+    print(f"  要約: 生成済み ({len(structured_data['summary'])}文字)")
+else:
+    print(f"  要約: null（生成失敗）")
+```
+
+### テスト結果
+
+#### 正常ケース（Kitaya 4）
+- 654文字の文字起こし → 947文字の要約生成成功
+- JSON保存: `"summary": "【エグゼクティブサマリー】..."`
+- 統計表示: "要約: 生成済み (947文字)"
+
+#### フォールバックケース想定動作
+- PROHIBITED_CONTENT発生時: `summarize_text()` returns `None`
+- 警告メッセージ表示: "要約生成に失敗しましたが、文字起こし結果は保存されます"
+- JSON保存: `"summary": null`
+- 統計表示: "要約: null（生成失敗）"
+- **重要**: 文字起こしデータ（segments, full_text, metadata）は全て保存される
+
+### データ保護戦略
+1. **文字起こしデータの優先保護**: 音声→テキスト変換は高コスト処理のため、要約失敗でも必ず保存
+2. **明示的なnull値**: 要約失敗を`null`として記録し、後から要約のみ再生成可能
+3. **ユーザー通知**: ログとJSON両方で要約失敗状態を明示
+
+### 技術的詳細
+- **JSON構造**: `create_structured_json()`は既に`summary`パラメータをそのまま格納する設計のため変更不要
+- **Python JSON encoding**: `json.dump()`は`None`を自動的に`null`に変換
+- **エラーハンドリング**: 要約失敗は処理全体のエラーではなく、部分的な機能低下として扱う
+
+### 成果
+- ✅ summarize_text()フォールバック処理実装
+- ✅ main()での`None`ハンドリング追加
+- ✅ 統計表示改善
+- ✅ テスト成功（正常ケース確認）
+- ✅ データロスト防止（文字起こし結果の確実な保存）
+
 ## 更新履歴
 
+- **2025-10-15**: Phase 9.10完了（要約失敗時のフォールバック処理実装：summary=null保存、文字起こしデータ優先保護）
+- **2025-10-15**: Phase 9.9完了（詳細ログ実装と根本原因分析：ログバッファリング解決、Gemini API非決定性特定）
 - **2025-10-15**: Phase 9.8完了（エラーハンドリング改善：JSONパースエラー対策、exit code適切化、詳細ログ記録）
 - **2025-10-15**: Phase 9.7完了（重複処理防止機構：filelock実装、並行処理対応、リソース削減）
 - **2025-10-15**: Phase 9.6完了（ポーリング実装削除、Webhook実装に一本化、設定ファイルクリーンアップ）

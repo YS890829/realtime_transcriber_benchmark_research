@@ -350,6 +350,7 @@ def transcribe_audio_with_gemini(file_path):
 def summarize_text(text):
     """
     Gemini APIでテキストを要約（詳細ログ付き）
+    失敗時はNoneを返す（例外を上げない）
     """
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel("gemini-2.5-flash")
@@ -397,7 +398,8 @@ def summarize_text(text):
                         for rating in feedback.safety_ratings:
                             print(f"    - {rating}", flush=True)
 
-                raise ValueError(f"Response blocked: candidates is empty. prompt_feedback={feedback if hasattr(response, 'prompt_feedback') else 'N/A'}")
+                print(f"  [要約API] ⚠️  要約生成失敗（フォールバック: summary=null）", flush=True)
+                return None
 
             # 正常な場合のログ
             candidate = response.candidates[0]
@@ -414,9 +416,10 @@ def summarize_text(text):
 
     except Exception as e:
         print(f"  [要約API] ❌ Exception: {type(e).__name__}: {e}", flush=True)
+        print(f"  [要約API] ⚠️  要約生成失敗（フォールバック: summary=null）", flush=True)
         import traceback
         traceback.print_exc()
-        raise
+        return None
 
 
 
@@ -528,12 +531,15 @@ def main():
 
         print("[2/3] 要約生成中...")
 
-        # 要約生成
+        # 要約生成（失敗時はNone）
         summary = summarize_text(transcription_result["text"])
+
+        if summary is None:
+            print("  ⚠️  要約生成に失敗しましたが、文字起こし結果は保存されます（summary: null）", flush=True)
 
         print("[3/3] JSON構造化中...")
 
-        # 構造化JSON生成
+        # 構造化JSON生成（summaryがNoneでも問題なし）
         structured_data = create_structured_json(audio_path, transcription_result, summary)
 
         # 出力ファイル名を生成
@@ -548,6 +554,12 @@ def main():
         print(f"  文字数: {structured_data['metadata']['transcription']['char_count']}")
         print(f"  単語数: {structured_data['metadata']['transcription']['word_count']}")
         print(f"  セグメント数: {structured_data['metadata']['transcription']['segment_count']}")
+
+        # 要約状態表示
+        if structured_data['summary']:
+            print(f"  要約: 生成済み ({len(structured_data['summary'])}文字)")
+        else:
+            print(f"  要約: null（生成失敗）")
 
         # 話者情報表示
         if 'speakers' in structured_data and structured_data['speakers']:
