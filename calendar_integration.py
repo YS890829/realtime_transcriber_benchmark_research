@@ -145,13 +145,14 @@ def get_events_for_file_date(file_date: str, calendar_id: str = 'primary') -> li
 
         print(f"🔍 {file_date}の予定を検索中...")
 
-        # Calendar API呼び出し
+        # Calendar API呼び出し（descriptionも明示的に取得）
         events_result = service.events().list(
             calendarId=calendar_id,
             timeMin=time_min,
             timeMax=time_max,
             singleEvents=True,
-            orderBy='startTime'
+            orderBy='startTime',
+            fields='items(id,summary,start,end,description,attendees)'
         ).execute()
 
         events = events_result.get('items', [])
