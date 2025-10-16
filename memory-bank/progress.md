@@ -2795,3 +2795,88 @@ Phase 10-4: Google Docs作成（既存）
 - **後方互換性**: ENABLE_ADVANCED_PROCESSING=falseの場合は現在の動作を維持
 
 **次のアクション**: Phase 11-1, 11-2完了後、Phase 11-3実装開始
+
+---
+
+## Phase 11-3: 参加者DB統合 + Phase 2-6自動パイプライン（実装中 - 2025-10-16開始）
+
+**目的**:
+1. カレンダーdescriptionから参加者情報を抽出し、構造化データベースで管理
+2. 要約生成時に過去の参加者情報を活用
+3. Phase 2-6（話者推論・エンティティ抽出・Vector DB）の自動実行
+
+**実装方針**:
+- ✅ DB更新: UPSERT対応（新規 + 既存参加者更新）
+- ✅ 話者推論: infer_speakers.py とカレンダー情報の統合
+- ✅ Phase 3活用: display_names バリエーション拡充
+- ✅ スコープ: 「会議参加者」特化（会話内言及は将来Phase）
+- ✅ 識別方法: description中心、attendeesフィールド不使用
+- ✅ RAG: 当面構築不要（学習データ蓄積優先）
+- ✅ LLM最適化: 5つの呼び出しを維持
+
+**全体処理フロー**:
+```
+音声ファイル（.m4a）
+  ↓ Phase 1: 文字起こし（Gemini API）
+*_structured.json（Gemini文字起こし結果）
+  ↓ Phase 11-3（リアルタイム）
+Step 1: JSON読み込み
+Step 2: カレンダーイベントマッチング（LLM① Gemini 2.0 Flash）
+Step 3: 参加者抽出（LLM② Gemini 2.0 Flash）
+Step 4: 参加者DB検索（過去情報取得 - SQL）
+Step 5: 話者推論（LLM③ Gemini 2.5 Pro、カレンダー統合版）
+Step 6: 要約生成（LLM④ Gemini 2.5 Pro、参加者DB情報統合）
+Step 7: 参加者DB更新（UPSERT - SQL）
+Step 8: 会議情報登録（SQL）
+  ↓
+更新された*_structured.json + 参加者DB更新完了
+  ↓ Phase 2-6（バッチ処理）
+Phase 3: トピック/エンティティ抽出（LLM⑤ Gemini 2.0 Flash）
+Phase 4: エンティティ解決
+Phase 5: Vector DB構築
+Phase 6: RAG検証（スキップ）
+```
+
+**実装マイルストーン**:
+- **M1: データベース基盤**（3日）
+  - participants_db.sql: スキーマ定義（participants, meetings, participant_meetings）
+  - participants_db.py: CRUD操作API
+  - 単体テスト・コミット
+
+- **M2: 参加者抽出機能**（2日）
+  - extract_participants.py: description→参加者リスト抽出
+  - LLM抽出機能実装、精度評価（目標: Precision 90%以上）
+  - コミット
+
+- **M3: 話者推論統合版**（3日）
+  - enhanced_speaker_inference.py: カレンダー参加者情報統合
+  - 精度評価（目標: 95%以上維持）
+  - コミット
+
+- **M4: 統合パイプライン**（3日）
+  - integrated_pipeline.py: 8ステップのメインパイプライン
+  - summary_generator.py修正: 参加者DBコンテキスト追加
+  - エンドツーエンドテスト・コミット
+
+- **M5: バッチ処理**（2日）
+  - run_phase_2_6_batch.py: Phase 3-6自動実行
+  - 全ファイル一括処理テスト・コミット
+
+- **M6: 検証とドキュメント**（2日）
+  - 精度評価レポート作成
+  - docs/phase-11-3-architecture.md, phase-11-3-validation.md作成
+  - progress.md更新・コミット
+
+**LLM呼び出し戦略**:
+- リアルタイム: 4回（18-28秒）
+- バッチ: 1回/ファイル（5-8秒）
+- 合計: 5つの呼び出し
+
+**期待効果**:
+- 要約文脈情報量: +30%以上
+- 参加者名寄せ精度: 85%以上
+- 運用効率: 手動実行時間90%削減
+- 検索性: 参加者ベース検索実現
+
+**進捗状況**:
+- **2025-10-16**: Phase 11-3実装開始、M1（データベース基盤）着手
