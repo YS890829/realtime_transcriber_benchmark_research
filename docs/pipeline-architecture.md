@@ -12,15 +12,19 @@
 
 ## システム概要
 
-音声ファイルから高度な意味検索が可能な構造化データを生成する、6段階の多層パイプラインシステム。
+音声ファイルから高度な意味検索が可能な構造化データを生成し、クラウド連携とファイル管理を自動化する、多段階パイプラインシステム。
 
 ### 全体フロー
 
 ```
-音声ファイル (m4a/wav/mp3)
+【入力層】
+Google Drive / iCloud Drive / ローカル音声ファイル
+    ↓
+[監視・検知] webhook_server.py / icloud_monitor.py
+    ↓ 自動検知・ダウンロード
     ↓
 [Phase 1] 文字起こし (structured_transcribe.py)
-    ↓ _structured.json (Speaker 1/2, segments, timestamps)
+    ↓ _structured.json (Speaker 1/2, segments, timestamps, Gemini Audio API)
     ↓
 [Phase 2] 話者推論 (infer_speakers.py)
     ↓ _structured_with_speakers.json (Sugimoto/Other, confidence)
@@ -32,20 +36,27 @@
     ↓ _enhanced.json updated (canonical_name, entity_id)
     ↓
 [Phase 5] 統合Vector DB構築 (build_unified_vector_index.py)
-    ↓ ChromaDB: transcripts_unified (6,551 segments)
+    ↓ ChromaDB: transcripts_unified (複数ファイル統合)
     ↓
 [Phase 6] 検索・RAG (semantic_search.py / rag_qa.py)
     → セマンティック検索 / Q&A回答生成
+    ↓
+[Phase 10] ファイル管理・クラウド同期
+    ├─ Phase 10-1: 自動リネーム (generate_smart_filename.py)
+    ├─ Phase 10-2: クラウド削除 (cloud_file_manager.py)
+    └─ Phase 10-3: 統合レジストリ (unified_registry.py)
 ```
 
 ### 主要な技術的特徴
 
 1. **多層パイプライン構造**: 6つの独立したフェーズで段階的に情報を付加
-2. **API Tier切り替え**: FREE/PAID tierを環境変数で切り替え可能
-3. **統合Vector DB**: 複数ファイルを1つのコレクションに統合（クエリ数80%削減）
-4. **エンティティ統一**: canonical_nameとentity_idで全ファイル横断の一意性を保証
-5. **レート制限対応**: 各APIの制限に応じた待機処理実装
-6. **エラーハンドリング**: JSON修復、フォールバック処理
+2. **クラウド統合**: Google Drive + iCloud Driveの自動監視・重複検知
+3. **API Tier切り替え**: FREE/PAID tierを環境変数で切り替え可能
+4. **統合Vector DB**: 複数ファイルを1つのコレクションに統合（クエリ数80%削減）
+5. **エンティティ統一**: canonical_nameとentity_idで全ファイル横断の一意性を保証
+6. **自動ファイル管理**: スマートリネーム、クラウド削除、レジストリ管理
+7. **レート制限対応**: 各APIの制限に応じた待機処理実装
+8. **エラーハンドリング**: JSON修復、フォールバック処理
 
 ---
 
@@ -1047,12 +1058,295 @@ python-dotenv>=1.0.0
 
 ---
 
+## Phase 10: ファイル管理・クラウド連携
+
+### Phase 10-1: 自動ファイル名変更 (`generate_smart_filename.py`)
+
+**目的**: 文字起こし内容に基づき、最適なファイル名を自動生成してリネーム
+
+**処理内容**:
+- Gemini 2.0 Flash APIで要約・全文から会話トピックを抽出
+- 日本語対応のファイル名生成（macOS/Windows互換）
+- YYYYMMDD形式の日付を自動付与
+- 音声ファイル + 関連JSON等を一括リネーム
+- Google Driveファイルは削除するため、ローカルのみリネーム
+
+**入力**: `*_structured.json`
+**出力**: リネームされた音声ファイル + JSON
+
+**主要機能**:
+```python
+def generate_smart_filename_from_json(json_path):
+    # JSONから要約・全文を抽出
+    full_text = data.get("full_text", "")
+    summary = data.get("summary", "")
+
+    # Gemini APIで最適なファイル名生成
+    prompt = """
+    以下の文字起こしデータから、ファイル名を生成してください。
+    要件:
+    - 20-30文字以内
+    - 日本語OK
+    - 日付付与（YYYYMMDD）
+    - 会話の核心を表現
+    """
+
+    # ファイル名の安全性チェック
+    safe_filename = sanitize_filename(generated_name)
+
+    # 音声ファイル + JSON を一括リネーム
+    rename_audio_and_json(audio_path, safe_filename)
+```
+
+**リネーム例**:
+```
+変更前: temp_1a2b3c4d5e.m4a
+変更後: 20251015_営業戦略ミーティング_Q4計画.m4a
+```
+
+**環境変数**:
+```bash
+AUTO_RENAME_FILES=true  # 有効化
+GEMINI_API_KEY_FREE=your_api_key
+```
+
+**所要時間**: 約3-5秒
+
+---
+
+### Phase 10-2: クラウドファイル自動削除 (`cloud_file_manager.py`)
+
+**目的**: 文字起こし完了後、Google Driveの音声ファイルを自動削除してストレージ節約
+
+**処理内容**:
+- JSON完全性の5項目検証（ファイル存在、サイズ、パース可能、segments、full_text、metadata）
+- 検証合格後にGoogle Driveファイルを削除
+- ローカルファイルは保持
+- 削除イベントを`.deletion_log.jsonl`に記録
+- 削除失敗時も処理続行（非致命的エラー）
+
+**入力**: `*_structured.json` + Google Drive file_id
+**出力**: 削除ログ (`.deletion_log.jsonl`)
+
+**主要機能**:
+```python
+def validate_json_completeness(json_path):
+    """5項目の完全性チェック"""
+    checks = {
+        'file_exists': os.path.exists(json_path),
+        'file_size_bytes': os.path.getsize(json_path),
+        'json_parsable': True,
+        'has_segments': len(data.get('segments', [])) > 0,
+        'has_full_text': len(data.get('full_text', '')) > 10,
+        'has_metadata': 'metadata' in data
+    }
+    return all(checks.values()), checks
+
+def delete_drive_file_if_valid(file_id, json_path):
+    """検証合格後にGoogle Driveファイル削除"""
+    is_valid, details = validate_json_completeness(json_path)
+
+    if is_valid:
+        # Google Drive API呼び出し
+        drive_service.files().delete(fileId=file_id).execute()
+        log_deletion(file_id, json_path, success=True)
+    else:
+        log_deletion(file_id, json_path, success=False, reason="Validation failed")
+```
+
+**削除ログ形式** (`.deletion_log.jsonl`):
+```json
+{
+  "timestamp": "2025-10-15T07:31:46+00:00",
+  "file_id": "1K5RZwauhMSb_jHdhkYaIPsA-6WbkQA41",
+  "file_name": "recording.m4a",
+  "json_path": "downloads/20251015_会議_structured.json",
+  "validation_passed": true,
+  "validation_details": {
+    "segments_count": 33,
+    "full_text_length": 530,
+    "file_size_bytes": 9538
+  },
+  "deleted": true,
+  "error": null
+}
+```
+
+**所要時間**: 約1-2秒
+
+---
+
+### Phase 10-3: iCloud Drive統合 (`icloud_monitor.py` + `unified_registry.py`)
+
+**目的**: iCloud Driveへの音声ファイル保存を自動検知し、Google Driveとの重複を防止
+
+**処理内容**:
+- watchdogライブラリでiCloud Driveをリアルタイム監視（FSEvents）
+- SHA-256ハッシュで同一ファイルを検知（重複防止）
+- 統合レジストリで Google Drive + iCloud Drive を一元管理
+- ファイル安定待機（iCloud同期完了確認）
+- file_id ↔ ファイル名マッピング（リネーム後も追跡可能）
+
+**入力**: iCloud Drive音声ファイル (.m4a, .mp3, .wav等)
+**出力**: 統合レジストリ (`.processed_files_registry.jsonl`)
+
+**主要機能**:
+```python
+class ICloudMonitor:
+    def __init__(self, icloud_path):
+        self.observer = Observer()
+        self.handler = AudioFileHandler()
+
+    def on_created(self, event):
+        """ファイル作成時のハンドラ"""
+        # ファイル安定待機（iCloud同期完了）
+        wait_for_file_stability(file_path, timeout=300)
+
+        # SHA-256ハッシュ計算
+        file_hash = calculate_sha256(file_path)
+
+        # 重複チェック
+        if registry.is_duplicate(file_hash):
+            print(f"⚠️  Duplicate detected: {file_path}")
+            return
+
+        # 文字起こし実行
+        structured_transcribe(file_path)
+
+        # レジストリ登録
+        registry.add_entry(
+            source="icloud_drive",
+            file_hash=file_hash,
+            original_name=file_name,
+            local_path=file_path
+        )
+
+class UnifiedRegistry:
+    def is_duplicate(self, file_hash):
+        """ハッシュベースの重複検知"""
+        for entry in self.load_registry():
+            if entry['hash'] == file_hash:
+                return True
+        return False
+
+    def add_entry(self, source, file_hash, original_name, **kwargs):
+        """統合レジストリに登録"""
+        entry = {
+            'source': source,  # 'google_drive' or 'icloud_drive'
+            'file_id': kwargs.get('file_id', None),
+            'hash': file_hash,
+            'original_name': original_name,
+            'renamed_to': kwargs.get('renamed_to', None),
+            'local_path': kwargs.get('local_path', ''),
+            'processed_at': datetime.now(timezone.utc).isoformat()
+        }
+        self.append_to_jsonl(entry)
+```
+
+**統合レジストリ形式** (`.processed_files_registry.jsonl`):
+```jsonl
+{"source":"google_drive","file_id":"16BNBa773...","hash":"a1b2c3d4...","original_name":"recording.m4a","renamed_to":"20251015_会議.m4a","local_path":"downloads/20251015_会議.m4a","processed_at":"2025-10-15T16:30:00Z"}
+{"source":"icloud_drive","file_id":null,"hash":"e5f6g7h8...","original_name":"memo.m4a","renamed_to":"20251015_メモ.m4a","local_path":"~/Library/Mobile Documents/.../memo.m4a","processed_at":"2025-10-15T16:35:00Z"}
+```
+
+**重複検知の動作例**:
+```
+1. [13:00] Google Driveに手動アップロード
+   → 文字起こし実行
+   → ハッシュ "a1b2c3..." をレジストリ登録
+
+2. [13:30] 同じファイルがiCloud Driveに同期
+   → ハッシュ計算 → "a1b2c3..."
+   → レジストリで重複検知
+   → スキップ（二重処理防止）
+```
+
+**環境変数**:
+```bash
+ENABLE_ICLOUD_MONITORING=true
+ICLOUD_DRIVE_PATH=~/Library/Mobile Documents/com~apple~CloudDocs
+PROCESSED_FILES_REGISTRY=.processed_files_registry.jsonl
+```
+
+**実行例**:
+```bash
+# iCloud監視起動
+python icloud_monitor.py
+
+# Google Drive Webhookと併用
+# ターミナル1
+python webhook_server.py
+
+# ターミナル2
+python icloud_monitor.py
+```
+
+**所要時間**: リアルタイム監視（常駐プロセス）
+
+---
+
+## クラウド連携の全体フロー
+
+```mermaid
+graph TB
+    subgraph "入力ソース"
+        A1[Google Drive]
+        A2[iCloud Drive]
+        A3[ローカルファイル]
+    end
+
+    subgraph "監視・検知"
+        B1[webhook_server.py<br/>Google Drive Webhook]
+        B2[icloud_monitor.py<br/>watchdog FSEvents]
+    end
+
+    subgraph "重複チェック"
+        C[unified_registry.py<br/>SHA-256ハッシュ]
+    end
+
+    subgraph "文字起こし"
+        D[structured_transcribe.py<br/>Gemini Audio API]
+    end
+
+    subgraph "Phase 10: ファイル管理"
+        E1[Phase 10-1<br/>generate_smart_filename.py<br/>自動リネーム]
+        E2[Phase 10-2<br/>cloud_file_manager.py<br/>Google Drive削除]
+        E3[Phase 10-3<br/>unified_registry.py<br/>レジストリ更新]
+    end
+
+    subgraph "Phase 2-6"
+        F[話者推論→トピック抽出<br/>→Vector DB→検索]
+    end
+
+    A1 --> B1
+    A2 --> B2
+    A3 --> D
+
+    B1 --> C
+    B2 --> C
+
+    C -->|重複なし| D
+    C -->|重複あり| G[スキップ]
+
+    D --> E1
+    E1 --> E2
+    E2 --> E3
+    E3 --> F
+
+    style C fill:#ffeaa7
+    style E1 fill:#74b9ff
+    style E2 fill:#fd79a8
+    style E3 fill:#a29bfe
+```
+
+---
+
 ## 今後の拡張案
 
 1. **バッチ処理**: 複数ファイルを一括処理
 2. **話者の詳細化**: Otherの具体的な名前推論
 3. **要約の階層化**: 全体要約 + セクション要約
-4. **ファイル名の自動リネーム**: 生成したファイル名で実際にリネーム
+4. **Dropbox連携**: Dropbox APIの統合
 5. **レポート生成**: 処理結果のサマリーレポート
 
 ---

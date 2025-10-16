@@ -2217,7 +2217,455 @@ if registry.is_processed(user_display_name):
 
 **Phase 10-3.1 完了判定**: ✅✅✅ **全機能動作確認済み（エンドツーエンドテスト完了）**
 
-**次のアクション**: ✅ Phase 10完全完了（Phase 10-1 + 10-2 + 10-3 + 10-3.1）
+**次のアクション**: ✅ Phase 10完全完了（Phase 10-1 + 10-2 + 10-3 + 10-3.1） → Phase 10-4, 10-5, Phase 11実装開始
+
+---
+
+## Phase 11: 文脈情報統合＋プロファイル管理（計画中）
+
+**計画日**: 2025-10-16
+**目標**: Googleカレンダー連携、個人プロフィール管理、Google Driveアップロード、サーバー常時稼働の4機能実装
+
+### 背景
+
+researchフォルダ内の調査結果に基づき、以下の機能を実装:
+1. 文脈情報統合により文字起こし精度を30-54%向上（WER削減）
+2. 個人関係グラフで人名認識精度を30-40%向上
+3. スマホからの文字起こし結果確認
+4. リアルタイム文字起こしの安定稼働
+
+### 実装順序と優先度
+
+```
+Phase 10-4: Google Driveアップロード（1日）← 最もシンプル、即座の価値提供
+    ↓
+Phase 10-5: サーバー常時稼働（1日）← インフラ整備、テスト環境改善
+    ↓
+Phase 11-1: Googleカレンダー連携（2日）← メイン機能、文脈情報統合
+    ↓
+Phase 11-2: 個人プロフィール管理（1.5日）← オプション機能、最後でも可
+```
+
+**合計実装期間**: 5.5日
+
+---
+
+### Phase 10-4: 文字起こし結果のGoogle Driveアップロード（優先度: 最高）
+
+**目標**: 文字起こし完了後、結果JSONをGoogle Driveへ自動アップロード。スマホからいつでも確認可能にする。
+
+**実装工数**: 1日
+
+**完了条件**:
+- [ ] `drive_upload.py` 実装
+- [ ] Google Drive APIでファイルアップロード機能
+- [ ] アップロード先: `My Drive/transcriptions/`
+- [ ] `structured_transcribe.py`に統合
+- [ ] 環境変数 `ENABLE_DRIVE_UPLOAD` でON/OFF切り替え
+- [ ] アップロードログ記録（`.upload_log.jsonl`）
+- [ ] 5ファイルでテスト成功
+
+**実装内容**:
+
+1. **drive_upload.py（新規、約150行）**
+   - Google Drive API使用
+   - `*_structured.json`をアップロード
+   - フォルダ存在確認・自動作成
+   - アップロード完了ログ記録
+
+2. **structured_transcribe.py（拡張）**
+   ```python
+   文字起こし完了後:
+   1. ローカルに*_structured.json保存
+   2. drive_upload.py呼び出し
+   3. Google Driveへアップロード
+   4. アップロードログ記録
+   ```
+
+3. **処理フロー**
+   ```
+   文字起こし完了
+       ↓
+   ローカル保存（downloads/）
+       ↓
+   Google Driveアップロード（My Drive/transcriptions/）
+       ↓
+   アップロードログ記録（.upload_log.jsonl）
+   ```
+
+**環境変数追加**:
+```bash
+# Phase 10-4: Google Driveアップロード
+ENABLE_DRIVE_UPLOAD=true
+DRIVE_UPLOAD_FOLDER=transcriptions
+UPLOAD_LOG_FILE=.upload_log.jsonl
+```
+
+**スマホからのアクセス方法**:
+- Google Driveアプリで`My Drive/transcriptions/`を開く
+- JSON形式で確認
+- 必要に応じてJSON Viewerアプリ使用
+
+**期待効果**:
+- スマホからいつでも文字起こし結果確認可能
+- クラウドバックアップ
+- 複数デバイスでの共有
+
+---
+
+### Phase 10-5: サーバー常時稼働化（優先度: 高）
+
+**目標**: webhook_server.pyを常時稼働させ、いつでもリアルタイムで文字起こし可能にする。
+
+**実装工数**: 1日
+
+**完了条件**:
+- [ ] launchd plist作成
+- [ ] 起動スクリプト（`start_webhook.sh`）作成
+- [ ] 停止スクリプト（`stop_webhook.sh`）作成
+- [ ] ログローテーション設定
+- [ ] macOS起動時の自動開始確認
+- [ ] クラッシュ時の自動再起動確認
+- [ ] 24時間稼働テスト成功
+
+**実装内容**:
+
+1. **launchd plist（新規）**
+   ```xml
+   ファイル: ~/Library/LaunchAgents/com.user.transcription-webhook.plist
+
+   設定:
+   - Label: com.user.transcription-webhook
+   - Program: venv/bin/python
+   - ProgramArguments: webhook_server.py
+   - RunAtLoad: true（macOS起動時に自動開始）
+   - KeepAlive: true（クラッシュ時に自動再起動）
+   - StandardOutPath: /tmp/transcription-webhook.log
+   - StandardErrorPath: /tmp/transcription-webhook.error.log
+   ```
+
+2. **起動・停止スクリプト（新規）**
+   ```bash
+   # start_webhook.sh
+   launchctl load ~/Library/LaunchAgents/com.user.transcription-webhook.plist
+
+   # stop_webhook.sh
+   launchctl unload ~/Library/LaunchAgents/com.user.transcription-webhook.plist
+
+   # status_webhook.sh
+   launchctl list | grep transcription-webhook
+   ```
+
+3. **ログ確認コマンド**
+   ```bash
+   # リアルタイムログ
+   tail -f /tmp/transcription-webhook.log
+
+   # エラーログ
+   tail -f /tmp/transcription-webhook.error.log
+   ```
+
+**環境変数追加**:
+```bash
+# Phase 10-5: 常時稼働
+WEBHOOK_SERVER_PORT=8000
+WEBHOOK_LOG_PATH=/tmp/transcription-webhook.log
+```
+
+**運用方法**:
+```bash
+# 初回セットアップ
+./start_webhook.sh
+
+# ステータス確認
+launchctl list | grep transcription-webhook
+
+# ログ確認
+tail -f /tmp/transcription-webhook.log
+
+# 停止
+./stop_webhook.sh
+```
+
+**期待効果**:
+- macOS起動時に自動でwebhook_server.py起動
+- クラッシュ時に自動再起動
+- ログファイルで動作確認可能
+- 手動起動不要
+
+**注意事項**:
+- macOSスリープ時は処理されない（省エネルギー設定で調整可能）
+- ngrok URLは手動更新が必要（無料版は2時間制限）
+- ログローテーション未実装（長期稼働時は手動削除）
+
+---
+
+### Phase 11-1: Googleカレンダー連携による文脈情報統合（優先度: 高）
+
+**目標**: Googleカレンダーの該当予定の「メモ」フィールドから文脈情報を取得し、文字起こし精度を向上させる。
+
+**背景**: 2025年の業界標準機能。文脈情報活用により:
+- WER（単語誤り率）30-54%削減
+- 話者識別精度15-27%向上
+- 専門用語認識30-40%向上
+
+**実装工数**: 2日
+
+**完了条件**:
+- [ ] `calendar_integration.py` 実装
+- [ ] Google Calendar API認証
+- [ ] ファイル作成時刻ベースでイベント検索（±30分）
+- [ ] イベントの「メモ」フィールド取得
+- [ ] `structured_transcribe.py`にプロンプト統合
+- [ ] 環境変数 `ENABLE_CALENDAR_INTEGRATION` でON/OFF切り替え
+- [ ] 5ファイルでテスト成功（カレンダーメモあり/なし両方）
+
+**実装内容**:
+
+1. **calendar_integration.py（新規、約200行）**
+   ```python
+   主要機能:
+   - Google Calendar API認証
+   - 時刻ベースでイベント検索
+   - イベントの「メモ」（description）フィールド取得
+   - キャッシュ管理（.context_cache/）
+   ```
+
+2. **structured_transcribe.py（既存拡張）**
+   ```python
+   追加機能:
+   - --calendar-match オプション追加
+   - ファイル作成時刻の取得（os.path.getmtime）
+   - カレンダーイベント自動検索
+   - メモ内容をプロンプトに埋め込み
+   ```
+
+3. **該当予定の判断ロジック**
+   ```
+   1. 音声ファイルの作成時刻を取得
+   2. Googleカレンダーから時刻±30分の予定を検索
+   3. 該当予定の「メモ」フィールドを取得
+   4. メモ内容を文字起こしプロンプトに統合
+   ```
+
+4. **処理フロー**
+   ```
+   structured_transcribe.py実行
+       ↓
+   ファイル作成時刻取得
+       ↓
+   calendar_integration.py呼び出し
+       ├─ 時刻±30分でイベント検索
+       └─ 該当イベントの「メモ」取得
+       ↓
+   プロンプトに文脈情報追加:
+   【会議メモ】
+   {カレンダーのメモ内容}
+
+   上記の情報を考慮して文字起こしを実行してください。
+       ↓
+   Gemini API呼び出し（文脈情報付き）
+   ```
+
+**環境変数追加**:
+```bash
+# Phase 11-1: カレンダー連携
+ENABLE_CALENDAR_INTEGRATION=false
+GOOGLE_CALENDAR_SCOPES=https://www.googleapis.com/auth/calendar.readonly
+CALENDAR_TOKEN_PATH=calendar_token.json
+CALENDAR_SEARCH_WINDOW_MINUTES=30
+```
+
+**使用例**:
+```bash
+# カレンダー連携なし（既存動作）
+python structured_transcribe.py meeting.m4a
+
+# カレンダー連携あり
+python structured_transcribe.py meeting.m4a --calendar-match
+```
+
+**カレンダーメモの書き方（推奨）**:
+```
+【参加者】
+- 山田太郎（営業部長）
+- 田中花子（マーケティング）
+
+【トピック】
+- Q4戦略レビュー
+- 新製品ローンチ計画
+
+【専門用語】
+- CloudSync API
+- KPI: CAC, LTV
+```
+
+**期待効果**:
+- 会議録音の話者識別が劇的に向上
+- 専門用語（API名、製品名など）の誤認識が減少
+- 議事録としての完成度向上
+- カレンダーに事前情報を書くだけで精度向上
+
+**注意事項**:
+- Calendar API認証が必要（token.jsonと別にcalendar_token.json）
+- 時刻マッチングの精度（±30分で妥当か確認）
+- メモフィールドが空の場合は通常の文字起こしを実行
+
+---
+
+### Phase 11-2: 個人プロフィール管理（軽量版）（優先度: 中）
+
+**目標**: 個人メモ・家族会議での人名認識精度を向上させる。既存RAGシステムとの重複を避け、軽量なJSON管理で実装。
+
+**背景**:
+- 人名認識精度30-40%向上
+- ニックネーム解決250-300%向上（「妻」「太郎」→本名へ自動変換）
+- プライバシー保護のため完全ローカル実装
+
+**実装工数**: 1.5日
+
+**完了条件**:
+- [ ] `personal_profiles.json` 作成
+- [ ] `profile_manager.py` 実装
+- [ ] `structured_transcribe.py`にプロフィール統合
+- [ ] 環境変数 `ENABLE_PERSONAL_PROFILES` でON/OFF切り替え
+- [ ] プライバシー保護確認（完全ローカル、Git除外）
+- [ ] 5ファイルでテスト成功（個人メモ・家族会議）
+
+**実装内容**:
+
+1. **personal_profiles.json（新規、ローカルのみ）**
+   ```json
+   ファイル: profiles/personal_profiles.json
+
+   {
+     "山田太郎": {
+       "nicknames": ["太郎", "太郎さん"],
+       "relationship": "friend",
+       "notes": "大学時代の友人、エンジニア"
+     },
+     "田中花子": {
+       "nicknames": ["花ちゃん", "花子", "妻"],
+       "relationship": "family",
+       "notes": "配偶者"
+     }
+   }
+   ```
+
+2. **profile_manager.py（新規、約100行）**
+   ```python
+   機能:
+   - JSONファイルの読み書き
+   - 名前→プロフィール検索
+   - ニックネーム解決
+   - 登録・更新・削除機能
+   ```
+
+3. **structured_transcribe.py（拡張）**
+   ```python
+   追加機能:
+   - --use-profiles オプション
+   - プロフィール情報をプロンプトに追加
+
+   プロンプト例:
+   【登録済み人物】
+   - 山田太郎（太郎、太郎さん）: 友人、エンジニア
+   - 田中花子（花ちゃん、妻）: 家族
+
+   上記の人物が会話に登場した場合、適切に識別してください。
+   ```
+
+**環境変数追加**:
+```bash
+# Phase 11-2: 個人プロフィール
+ENABLE_PERSONAL_PROFILES=false
+PROFILES_PATH=profiles/personal_profiles.json
+```
+
+**RAGシステムとの使い分け**:
+
+| 機能 | 個人プロフィール | RAG/ベクトルDB |
+|------|----------------|---------------|
+| **タイミング** | 文字起こし前 | 文字起こし後 |
+| **目的** | プロンプト強化 | 検索・分析 |
+| **データ** | 名前、関係性 | 全文字起こし内容 |
+| **検索対象** | 個人情報 | 会話内容 |
+
+**プライバシー保護設計**:
+- **完全ローカル**: クラウド送信なし
+- **Git除外**: `.gitignore`に`profiles/`追加
+- **データ最小化**: 名前、ニックネーム、関係性、簡単なメモのみ
+- **機密情報除外**: 健康・財務情報は実装しない
+
+**期待効果**:
+- 「妻が〜」→「田中花子が〜」と自動補完
+- 家族会議で話者識別の精度向上
+- 個人メモの検索性向上
+
+**注意事項**:
+- プライバシー最優先、完全ローカル実装
+- 機密情報は含めない設計
+- RAGとの重複を避ける（使い分け明確化）
+
+---
+
+### 新規ファイル構成
+
+```
+realtime_transcriber_benchmark_research/
+├── drive_upload.py                 # Phase 10-4（新規）
+├── start_webhook.sh                # Phase 10-5（新規）
+├── stop_webhook.sh                 # Phase 10-5（新規）
+├── status_webhook.sh               # Phase 10-5（新規）
+├── calendar_integration.py         # Phase 11-1（新規）
+├── profile_manager.py              # Phase 11-2（新規）
+├── structured_transcribe.py        # 拡張（各Phase統合）
+├── .upload_log.jsonl               # Phase 10-4
+├── .context_cache/                 # Phase 11-1
+├── profiles/                       # Phase 11-2
+│   └── personal_profiles.json      # Git除外
+└── ~/Library/LaunchAgents/
+    └── com.user.transcription-webhook.plist  # Phase 10-5
+```
+
+### .env更新内容
+
+```bash
+# Phase 10-4: Google Driveアップロード
+ENABLE_DRIVE_UPLOAD=true
+DRIVE_UPLOAD_FOLDER=transcriptions
+UPLOAD_LOG_FILE=.upload_log.jsonl
+
+# Phase 10-5: 常時稼働
+WEBHOOK_SERVER_PORT=8000
+WEBHOOK_LOG_PATH=/tmp/transcription-webhook.log
+
+# Phase 11-1: カレンダー連携
+ENABLE_CALENDAR_INTEGRATION=false
+GOOGLE_CALENDAR_SCOPES=https://www.googleapis.com/auth/calendar.readonly
+CALENDAR_TOKEN_PATH=calendar_token.json
+CALENDAR_SEARCH_WINDOW_MINUTES=30
+
+# Phase 11-2: 個人プロフィール
+ENABLE_PERSONAL_PROFILES=false
+PROFILES_PATH=profiles/personal_profiles.json
+```
+
+### .gitignore更新内容
+
+```
+# Phase 10-4
+.upload_log.jsonl
+
+# Phase 11-1
+calendar_token.json
+.context_cache/
+
+# Phase 11-2
+profiles/
+```
+
+**次のアクション**: Phase 10-4実装開始（drive_upload.py作成）
 
 ---
 
