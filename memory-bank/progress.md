@@ -2713,27 +2713,66 @@ profiles/
 
 ---
 
-## Phase 11-3 検討事項（未実装）
+## Phase 11-3: 高度な処理機能の自動パイプライン統合（未実装）
 
-**目的**: Phase 11-2（個人プロフィール管理）までの実装と、Phase 2-6の高度な処理機能を統合
+**目的**: Phase 2-4を自動パイプラインに統合し、話者・エンティティ情報を活用した高精度な要約を実現
 
-**統合対象のPhase 2-6機能**:
-- **Phase 2**: 話者推論 (infer_speakers.py) - Gemini 2.5 Proによる話者識別
-- **Phase 3**: トピック・エンティティ抽出 (add_topics_entities.py) - Gemini 2.0 Flashによるトピック/エンティティ/タグ抽出
-- **Phase 4**: エンティティ名寄せ (entity_resolution_llm.py) - 複数ファイル間のエンティティ統一
-- **Phase 5**: 統合ベクトルDB構築 (build_unified_vector_index.py) - ChromaDBへの統合インデックス作成
-- **Phase 6**: セマンティック検索・RAG (semantic_search.py, rag_qa.py) - 意味検索と質問応答
+**処理順序**:
+```
+文字起こし (structured_transcribe.py内)
+  ↓
+Phase 2: 話者推論 (infer_speakers.py)
+  ├─ 入力: *_structured.json
+  ├─ 出力: *_structured_with_speakers.json
+  └─ LLM: Gemini 2.5 Pro
+  ↓
+Phase 3: トピック・エンティティ抽出 (add_topics_entities.py)
+  ├─ 入力: *_structured_with_speakers.json
+  ├─ 出力: *_enhanced.json
+  └─ LLM: Gemini 2.0 Flash
+  ↓
+Phase 4: エンティティ名寄せ (entity_resolution_llm.py)
+  ├─ 入力: *_enhanced.json
+  ├─ 出力: *_enhanced.json (canonical_name, entity_id追加)
+  └─ LLM: Gemini 2.5 Pro
+  ↓
+要約生成（enhanced版）
+  ├─ 話者情報を活用
+  ├─ エンティティ情報を活用
+  ├─ トピック情報を活用
+  └─ 出力: *_enhanced.json内のsummaryフィールド更新
+  ↓
+Phase 10-1: ファイル名自動生成（既存）
+  ↓
+Phase 10-4: Google Docs作成（既存）
+```
+
+**Phase 11-2完了後に検討**:
+- **Phase 5**: 統合ベクトルDB構築 (build_unified_vector_index.py)
+- **Phase 6**: セマンティック検索・RAG (semantic_search.py, rag_qa.py)
+
+**実装方針**:
+1. structured_transcribe.py内での統合実装
+2. 環境変数でON/OFF切り替え可能（`ENABLE_ADVANCED_PROCESSING=true`）
+3. 各Phaseはモジュールとしてインポート
+4. エラー時は後続処理を続行（部分的失敗許容）
+5. 現在の要約生成（文字起こし直後）をPhase 4の後に移動
 
 **検討課題**:
-1. Phase 2-6を自動パイプライン（structured_transcribe.py）に統合するか？
-2. 統合する場合、実行順序と依存関係の整理
-3. Phase 11-2の個人プロフィールとPhase 2-6のエンティティ情報の連携方法
-4. 処理時間とコスト（Gemini API呼び出し）のバランス
-5. 手動実行のメリット（必要時のみ実行）vs 自動実行のメリット（常に最新状態）
+1. 処理時間の増加（各Phase毎にLLM呼び出し：約30-60秒追加）
+2. Gemini API無料枠の消費量（1ファイルあたり3回のLLM呼び出し追加）
+3. Phase 11-2個人プロフィールとの連携タイミング
+4. 要約生成タイミングの変更による既存動作への影響
 
 **現状**:
-- Phase 2-6は実装済みだが、手動実行のみ
-- run_full_pipeline.py でPhase 2-3のオーケストレーション可能
-- Phase 4-6は個別に手動実行が必要
+- Phase 2-4は実装済みだが、手動実行のみ
+- run_full_pipeline.py で話者推論→要約→ファイル名生成のオーケストレーション可能
+- Phase 4は複数ファイル横断処理が必要（バッチ実行）
+- 現在の要約は文字起こし直後に実行（話者情報なし）
 
-**次のアクション**: Phase 11-3実装時に統合方針を決定
+**実装上の注意**:
+- **要約生成タイミング変更**: 現在はstructured_transcribe.py内で文字起こし直後に実行 → Phase 2-4の後に移動
+- **新しい要約関数**: summarize_with_context.pyをベースに、エンティティ・トピック情報も活用する拡張版を作成
+- **後方互換性**: ENABLE_ADVANCED_PROCESSING=falseの場合は現在の動作を維持
+
+**次のアクション**: Phase 11-1, 11-2完了後、Phase 11-3実装開始
