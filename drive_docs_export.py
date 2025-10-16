@@ -131,11 +131,43 @@ def build_document_requests(data):
 
     # セクション1: サマリ
     summary_section = "━━━━━━━━━━━━━━━━━\n📊 サマリ\n━━━━━━━━━━━━━━━━━\n\n"
-    summary_text = data.get('summary', '要約情報なし')
-    if summary_text:
-        summary_section += summary_text + "\n\n"
+    summary_data = data.get('summary', {})
+
+    # Phase 11-1以降: summaryはdict形式
+    if isinstance(summary_data, dict):
+        summary_text = summary_data.get('summary', '')
+        topics = summary_data.get('topics', [])
+        action_items = summary_data.get('action_items', [])
+        keywords = summary_data.get('keywords', [])
+
+        if summary_text:
+            summary_section += f"{summary_text}\n\n"
+
+        if topics:
+            summary_section += "【主要トピック】\n"
+            for topic in topics:
+                summary_section += f"• {topic}\n"
+            summary_section += "\n"
+
+        if action_items:
+            summary_section += "【アクションアイテム】\n"
+            for item in action_items:
+                summary_section += f"• {item}\n"
+            summary_section += "\n"
+
+        if keywords:
+            summary_section += f"【キーワード】\n{', '.join(keywords)}\n\n"
+
+    # 旧形式: summaryは文字列
+    elif isinstance(summary_data, str):
+        if summary_data:
+            summary_section += summary_data + "\n\n"
+        else:
+            summary_section += "要約が生成されませんでした。\n\n"
+
+    # 要約情報なし
     else:
-        summary_section += "要約が生成されませんでした。\n\n"
+        summary_section += "要約情報なし\n\n"
 
     requests.append({
         'insertText': {

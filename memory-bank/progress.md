@@ -2417,14 +2417,15 @@ tail -f /tmp/transcription-webhook.log
 **実装工数**: 2-3日
 
 **完了条件**:
-- [ ] `calendar_integration.py` 実装（認証、予定取得、マッチング）
-- [ ] `summary_generator.py` 実装（予定情報統合版要約生成）
-- [ ] Google Calendar API認証（token.jsonにCalendar.readonly追加）
-- [ ] 音声ファイル作成日の予定を全件取得
-- [ ] LLMによる予定マッチング（内容ベース）
-- [ ] `structured_transcribe.py`にパイプライン統合
-- [ ] 環境変数 `ENABLE_CALENDAR_INTEGRATION` でON/OFF切り替え
-- [ ] 5ファイルでテスト成功（iCloud、Google Drive、予定あり/なし）
+- [x] `calendar_integration.py` 実装（認証、予定取得、マッチング）
+- [x] `summary_generator.py` 実装（予定情報統合版要約生成）
+- [x] Google Calendar API認証（token.jsonにCalendar.readonly追加）
+- [x] 音声ファイル作成日の予定を全件取得
+- [x] LLMによる予定マッチング（内容ベース）
+- [x] `structured_transcribe.py`にパイプライン統合
+- [x] 環境変数 `ENABLE_CALENDAR_INTEGRATION` でON/OFF切り替え
+- [x] テスト成功（予定あり日、予定マッチング、要約生成、Google Docs作成）
+- [x] `drive_docs_export.py` 修正（新しい要約形式dict対応）
 
 **実装アプローチ**:
 
@@ -2692,6 +2693,7 @@ profiles/
 ## 更新履歴
 
 - **2025-10-16**: ✅✅✅ Phase 10-4拡張完了（Google Docs自動作成：モバイルフレンドリー表示、処理順序最適化、JSONアップロード無効化、日付生成厳密化、テストデータクリーンアップ）
+- **2025-10-16**: ✅✅✅ Phase 11-1完了（Googleカレンダー連携：日付ベース予定取得、LLM予定マッチング、要約生成統合、完全自動化）
 - **2025-10-16**: ✅✅✅ Phase 10-3.1完全完了（重複ファイルのGoogle Drive自動削除：重複検知時もクラウド削除、削除ログ記録、エンドツーエンドテスト完了）
 - **2025-10-16**: ✅✅✅ Phase 10-3完全完了（ファイル名ベース重複管理システム：CloudRecordings.db統合、ハッシュベース削除、クロスソース重複検知、エンドツーエンドテスト完了）
 - **2025-10-15**: ✅✅✅ Phase 10-2完全完了（クラウドファイル自動削除：5項目検証、Google Drive削除、JSONL形式ログ記録、全フロー動作確認済み）

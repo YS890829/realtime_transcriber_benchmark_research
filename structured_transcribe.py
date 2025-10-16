@@ -617,6 +617,50 @@ def main():
         #         print(f"⚠️  Google Driveアップロードエラー: {e}")
         #         print("  文字起こし結果はローカルに保存されています")
 
+        # [Phase 11-1] Googleカレンダー連携（予定マッチング + 要約生成統合）
+        if os.getenv('ENABLE_CALENDAR_INTEGRATION', 'false').lower() == 'true':
+            try:
+                from calendar_integration import get_file_date, get_events_for_file_date, match_event_with_transcript
+                from summary_generator import generate_summary_with_calendar
+
+                print("\n📅 Googleカレンダー連携開始...")
+
+                # Stage 2: 音声ファイル作成日を取得
+                file_date = get_file_date(audio_path)
+
+                # Stage 1: その日の予定を全件取得
+                calendar_id = os.getenv('CALENDAR_ID', 'primary')
+                calendar_events = get_events_for_file_date(file_date, calendar_id)
+
+                # Stage 4: 予定マッチング
+                full_text = "\n".join([seg['text'] for seg in structured_data['segments']])
+                match_result = match_event_with_transcript(full_text, calendar_events)
+
+                # Stage 5: 予定情報を統合した要約生成
+                summary = generate_summary_with_calendar(
+                    structured_data['segments'],
+                    matched_event=match_result['matched_event']
+                )
+
+                # JSONメタデータに追加
+                structured_data['matched_calendar_event'] = {
+                    "event": match_result['matched_event'],
+                    "confidence_score": match_result['confidence_score'],
+                    "reasoning": match_result['reasoning']
+                }
+                structured_data['summary'] = summary
+
+                # JSONファイルを更新
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(structured_data, f, ensure_ascii=False, indent=2)
+                print(f"✅ カレンダー連携完了（予定マッチング + 要約生成）")
+
+            except Exception as e:
+                print(f"⚠️  カレンダー連携エラー: {e}")
+                print("  エラーが発生しましたが、後続処理を続行します")
+                import traceback
+                traceback.print_exc()
+
         # [Phase 10-4 拡張] Google Docs作成（モバイルフレンドリー、リネーム後のファイル名を使用）
         if os.getenv('ENABLE_DOCS_EXPORT', 'false').lower() == 'true':
             try:
