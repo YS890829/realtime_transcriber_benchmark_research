@@ -24,6 +24,7 @@ from participants_db import ParticipantsDB
 from extract_participants import extract_participants_from_description
 from enhanced_speaker_inference import infer_speakers_with_participants, apply_speaker_inference_to_structured_json
 from calendar_integration import get_events_for_file_date, match_event_with_transcript
+from summary_generator import generate_summary_with_calendar
 
 
 def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
@@ -155,9 +156,37 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
     # ========================
     # Step 6: 要約生成（参加者DB情報統合）
     # ========================
-    print("\n[Step 6] 要約生成")
-    print("  ⏭ スキップ（M4完成後に実装予定）")
-    # TODO: M4完成後にsummary_generator.pyを修正して実装
+    print("\n[Step 6] 要約生成中...")
+
+    # 参加者情報をコンテキストに追加
+    participants_context = ""
+    if participants_past_info:
+        participants_context = "\n【参加者の過去情報】\n"
+        for name, info in participants_past_info.items():
+            participants_context += f"- {name}\n"
+            if info.get('organization'):
+                participants_context += f"  組織: {info['organization']}\n"
+            if info.get('role'):
+                participants_context += f"  役職: {info['role']}\n"
+            participants_context += f"  過去の会議参加: {info['meeting_count']}回\n"
+            if info.get('notes'):
+                # notesの最初の100文字を表示
+                notes_preview = info['notes'][:100]
+                if len(info['notes']) > 100:
+                    notes_preview += "..."
+                participants_context += f"  メモ: {notes_preview}\n"
+
+    # 要約生成（既存関数を拡張版で使用）
+    try:
+        summary_data = generate_summary_with_calendar(
+            transcript_segments=segments,
+            matched_event=matched_event,
+            participants_context=participants_context
+        )
+        print(f"  ✓ 要約生成完了")
+    except Exception as e:
+        print(f"  ⚠ 要約生成エラー: {e}")
+        summary_data = None
 
     # ========================
     # Step 7: 参加者DB更新（UPSERT）
@@ -217,6 +246,7 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
         "matched_event": matched_event,
         "calendar_participants": calendar_participants,
         "inference_result": inference_result,
+        "summary_data": summary_data,
         "success": True
     }
 

@@ -22,13 +22,14 @@ import google.generativeai as genai
 load_dotenv()
 
 
-def generate_summary_with_calendar(transcript_segments: list, matched_event: dict = None) -> dict:
+def generate_summary_with_calendar(transcript_segments: list, matched_event: dict = None, participants_context: str = "") -> dict:
     """
-    予定情報を統合した要約生成
+    予定情報と参加者DB情報を統合した要約生成（Phase 11-3対応）
 
     Args:
         transcript_segments: 文字起こしセグメントリスト
         matched_event: マッチした予定情報（Noneの場合は予定情報なし）
+        participants_context: 参加者の過去情報（整形済みテキスト）
 
     Returns:
         {
@@ -110,6 +111,11 @@ def generate_summary_with_calendar(transcript_segments: list, matched_event: dic
         print("📝 予定情報を要約生成に統合します")
     else:
         print("📝 予定情報なしで要約生成します")
+
+    # 参加者DB情報を統合（Phase 11-3）
+    if participants_context:
+        calendar_context += f"\n{participants_context}"
+        print("📝 参加者DB情報を要約生成に統合します")
 
     # プロンプト作成
     prompt = f"""{calendar_context}
