@@ -74,11 +74,11 @@ def generate_summary_with_calendar(transcript_segments: list, matched_event: dic
         end_time = matched_event.get('end', {}).get('dateTime', matched_event.get('end', {}).get('date', ''))
         description = matched_event.get('description', '')
 
-        # 参加者リスト
+        # 参加者リスト（attendeesフィールドから取得）
         attendees = matched_event.get('attendees', [])
+        attendees_names = []
         if attendees:
             # emailからdisplayNameを優先、なければemailのユーザー名部分を使用
-            attendees_names = []
             for a in attendees:
                 display_name = a.get('displayName', '')
                 email = a.get('email', '')
@@ -87,18 +87,25 @@ def generate_summary_with_calendar(transcript_segments: list, matched_event: dic
                 elif email:
                     # email の @ 前を使用
                     attendees_names.append(email.split('@')[0])
-            attendees_str = '、'.join(attendees_names)
-        else:
-            attendees_str = 'なし'
+
+        # descriptionに参加者情報がある場合も考慮
+        # 実運用では「参加者：」「出席者：」などの記載がdescriptionに含まれることが多い
+        attendees_str = '、'.join(attendees_names) if attendees_names else '（attendeesフィールドには未記載）'
+
+        # メモ（description）に参加者情報が含まれている可能性があることを明示
+        description_note = ""
+        if description and any(keyword in description for keyword in ['参加者', '出席者', 'メンバー', '同席']):
+            description_note = "\n※ メモ内に参加者情報が記載されている可能性があります"
 
         calendar_context = f"""
 【関連するカレンダー予定】
 - タイトル: {summary_title}
 - 時刻: {start_time} 〜 {end_time}
-- メモ: {description if description else 'なし'}
-- 参加者: {attendees_str}
+- メモ: {description if description else 'なし'}{description_note}
+- 参加者（attendeesフィールド）: {attendees_str}
 
 この音声は上記の予定に関連する内容です。予定の情報も踏まえて要約してください。
+特に、メモ内に参加者や関係者の情報が記載されている場合は、それも参考にしてください。
 """
         print("📝 予定情報を要約生成に統合します")
     else:
