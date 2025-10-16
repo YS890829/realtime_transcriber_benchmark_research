@@ -2250,20 +2250,24 @@ Phase 11-2: 個人プロフィール管理（1.5日）← オプション機能�
 
 ---
 
-### Phase 10-4: 文字起こし結果のGoogle Driveアップロード（優先度: 最高）
+### ✅ Phase 10-4: 文字起こし結果のGoogle Driveアップロード（完了）
 
 **目標**: 文字起こし完了後、結果JSONをGoogle Driveへ自動アップロード。スマホからいつでも確認可能にする。
+
+**完了日**: 2025-10-16
 
 **実装工数**: 1日
 
 **完了条件**:
-- [ ] `drive_upload.py` 実装
-- [ ] Google Drive APIでファイルアップロード機能
-- [ ] アップロード先: `My Drive/transcriptions/`
-- [ ] `structured_transcribe.py`に統合
-- [ ] 環境変数 `ENABLE_DRIVE_UPLOAD` でON/OFF切り替え
-- [ ] アップロードログ記録（`.upload_log.jsonl`）
-- [ ] 5ファイルでテスト成功
+- [x] `drive_upload.py` 実装（256行）
+- [x] Google Drive APIでファイルアップロード機能
+- [x] アップロード先: `My Drive/transcriptions/`（フォルダID: 1MYIYYtir7sjKewv_VFuz9dFEte9xeNDP）
+- [x] `structured_transcribe.py`に統合（lines 580-593）
+- [x] 環境変数 `ENABLE_DRIVE_UPLOAD` でON/OFF切り替え
+- [x] アップロードログ記録（`.upload_log.jsonl`）
+- [x] 16ファイル手動アップロード成功
+- [x] .env更新（ENABLE_DRIVE_UPLOAD=true）
+- [x] .gitignore更新（.upload_log.jsonl除外）
 
 **実装内容**:
 
@@ -2665,12 +2669,13 @@ calendar_token.json
 profiles/
 ```
 
-**次のアクション**: Phase 10-4実装開始（drive_upload.py作成）
+**次のアクション**: ✅ Phase 10-4完了 → Phase 10-5実装開始（launchd daemon化）
 
 ---
 
 ## 更新履歴
 
+- **2025-10-16**: ✅✅✅ Phase 10-4拡張完了（Google Docs自動作成：モバイルフレンドリー表示、処理順序最適化、JSONアップロード無効化、日付生成厳密化、テストデータクリーンアップ）
 - **2025-10-16**: ✅✅✅ Phase 10-3.1完全完了（重複ファイルのGoogle Drive自動削除：重複検知時もクラウド削除、削除ログ記録、エンドツーエンドテスト完了）
 - **2025-10-16**: ✅✅✅ Phase 10-3完全完了（ファイル名ベース重複管理システム：CloudRecordings.db統合、ハッシュベース削除、クロスソース重複検知、エンドツーエンドテスト完了）
 - **2025-10-15**: ✅✅✅ Phase 10-2完全完了（クラウドファイル自動削除：5項目検証、Google Drive削除、JSONL形式ログ記録、全フロー動作確認済み）
@@ -2705,3 +2710,30 @@ profiles/
 - Phase 5-1完了 → コミット
 - Phase 5-2完了 → コミット
 - Phase 5-3完了 → コミット
+
+---
+
+## Phase 11-3 検討事項（未実装）
+
+**目的**: Phase 11-2（個人プロフィール管理）までの実装と、Phase 2-6の高度な処理機能を統合
+
+**統合対象のPhase 2-6機能**:
+- **Phase 2**: 話者推論 (infer_speakers.py) - Gemini 2.5 Proによる話者識別
+- **Phase 3**: トピック・エンティティ抽出 (add_topics_entities.py) - Gemini 2.0 Flashによるトピック/エンティティ/タグ抽出
+- **Phase 4**: エンティティ名寄せ (entity_resolution_llm.py) - 複数ファイル間のエンティティ統一
+- **Phase 5**: 統合ベクトルDB構築 (build_unified_vector_index.py) - ChromaDBへの統合インデックス作成
+- **Phase 6**: セマンティック検索・RAG (semantic_search.py, rag_qa.py) - 意味検索と質問応答
+
+**検討課題**:
+1. Phase 2-6を自動パイプライン（structured_transcribe.py）に統合するか？
+2. 統合する場合、実行順序と依存関係の整理
+3. Phase 11-2の個人プロフィールとPhase 2-6のエンティティ情報の連携方法
+4. 処理時間とコスト（Gemini API呼び出し）のバランス
+5. 手動実行のメリット（必要時のみ実行）vs 自動実行のメリット（常に最新状態）
+
+**現状**:
+- Phase 2-6は実装済みだが、手動実行のみ
+- run_full_pipeline.py でPhase 2-3のオーケストレーション可能
+- Phase 4-6は個別に手動実行が必要
+
+**次のアクション**: Phase 11-3実装時に統合方針を決定

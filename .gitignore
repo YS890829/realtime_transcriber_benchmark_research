@@ -41,6 +41,9 @@ downloads/
 # Phase 10-3 (iCloud Drive Integration)
 .processed_files_registry.jsonl
 
+# Phase 10-4 (Google Drive Upload)
+.upload_log.jsonl
+
 # Phase 5-3 (FastAPI + Push通知)
 .start_page_token.txt
 .channel_info.json

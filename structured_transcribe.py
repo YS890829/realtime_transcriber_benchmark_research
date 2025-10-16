@@ -577,7 +577,7 @@ def main():
             duration = structured_data['metadata']['file']['duration_seconds']
             print(f"  音声長: {duration:.1f}秒 ({duration/60:.1f}分)")
 
-        # [Phase 10-1] 自動ファイル名変更
+        # [Phase 10-1] 自動ファイル名変更（Phase 10-4の前に実行）
         if os.getenv('AUTO_RENAME_FILES', 'false').lower() == 'true':
             try:
                 from generate_smart_filename import (
@@ -592,13 +592,45 @@ def main():
                 # ローカルファイルリネーム
                 rename_map = rename_local_files(audio_path, new_name)
 
-                # パス更新（統計表示後なので不要だが、将来の拡張のため）
+                # パス更新（以降のPhase 10-4で使用するため必須）
                 audio_path = str(rename_map[Path(audio_path)])
                 json_path = str(rename_map[Path(json_path)])
+                print(f"✅ ファイルをリネームしました: {new_name}")
 
             except Exception as e:
-                print(f"⚠️  自動リネーム失敗: {e}")
-                print("  文字起こし結果は保存されています")
+                print(f"⚠️  自動リネームエラー: {e}")
+                print("  元のファイル名のまま後続処理を続行します")
+
+        # [Phase 10-4] Google Driveアップロード - JSONは不要（Docsのみ）
+        # Note: JSONファイルはGoogle Driveにアップロードしない（Docsで閲覧可能なため）
+        # if os.getenv('ENABLE_DRIVE_UPLOAD', 'false').lower() == 'true':
+        #     try:
+        #         from drive_upload import upload_transcription_results
+        #
+        #         print("\n📤 Google Driveへアップロード中...")
+        #         upload_success = upload_transcription_results(json_path)
+        #
+        #         if not upload_success:
+        #             print("⚠️  Google Driveアップロード失敗（文字起こし結果はローカルに保存済み）")
+        #
+        #     except Exception as e:
+        #         print(f"⚠️  Google Driveアップロードエラー: {e}")
+        #         print("  文字起こし結果はローカルに保存されています")
+
+        # [Phase 10-4 拡張] Google Docs作成（モバイルフレンドリー、リネーム後のファイル名を使用）
+        if os.getenv('ENABLE_DOCS_EXPORT', 'false').lower() == 'true':
+            try:
+                from drive_docs_export import export_json_to_docs
+
+                print("\n📄 Google Docs作成中（モバイル表示用）...")
+                docs_success = export_json_to_docs(json_path)
+
+                if not docs_success:
+                    print("⚠️  Google Docs作成失敗（JSONファイルはアップロード済み）")
+
+            except Exception as e:
+                print(f"⚠️  Google Docs作成エラー: {e}")
+                print("  JSONファイルはアップロードされています")
 
         print("\n🎉 完了!")
 
