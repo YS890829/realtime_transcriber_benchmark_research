@@ -16,10 +16,10 @@ load_dotenv()
 
 # Gemini APIキー選択（FREE/PAID tier）
 use_paid_tier = os.getenv("USE_PAID_TIER", "").lower() == "true"
-api_key = os.getenv("GEMINI_API_KEY_PAID") if use_paid_tier else os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY_PAID") if use_paid_tier else os.getenv("GEMINI_API_KEY_FREE")
 
 if not api_key:
-    print("❌ Error: GEMINI_API_KEY not found in environment variables")
+    print("❌ Error: GEMINI_API_KEY_FREE not found in environment variables")
     sys.exit(1)
 
 genai.configure(api_key=api_key)
@@ -117,7 +117,7 @@ def generate_enhanced_summary(full_text, topics, entities):
     """構造化データを活用した要約生成"""
     print(f"[2/3] 構造化要約生成中...")
 
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    # API key is already configured at the top of the script
     model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
     # トピック情報を文字列化
