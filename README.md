@@ -580,6 +580,192 @@ Phase 10-1（自動リネーム）とPhase 10-2（自動削除）は同時に動
 
 **理由**: どうせ削除するので、Google Drive上のファイル名変更は不要
 
+## Phase 10-3: iCloud Drive統合（NEW）
+
+iCloud Driveへの音声ファイル保存を自動検知し、Google Driveとの重複を防止して文字起こしします。
+
+### 機能概要
+
+- **リアルタイム検知**: watchdogライブラリでiCloud Driveを監視（ポーリング不要）
+- **重複防止**: SHA-256ハッシュで同一ファイルを検知し、二重処理を防止
+- **統合レジストリ**: Google Drive + iCloud Driveの処理履歴を一元管理
+- **ファイル安定待機**: iCloud同期完了を確認してから処理開始
+- **file_id ↔ ファイル名マッピング**: Phase 10-1でリネーム後も追跡可能
+
+### セットアップ
+
+#### 1. watchdogパッケージインストール
+
+```bash
+pip install -r requirements.txt  # watchdog>=4.0.0が含まれます
+```
+
+#### 2. 環境変数設定
+
+`.env`に以下を追加:
+
+```bash
+# Phase 10-3: iCloud Drive統合
+ENABLE_ICLOUD_MONITORING=true
+ICLOUD_DRIVE_PATH=~/Library/Mobile Documents/com~apple~CloudDocs
+PROCESSED_FILES_REGISTRY=.processed_files_registry.jsonl
+```
+
+### 使い方
+
+#### iCloud監視モード起動
+
+```bash
+python icloud_monitor.py
+```
+
+**出力例**:
+```
+============================================================
+🚀 iCloud Drive Monitor Started (Phase 10-3)
+============================================================
+📁 Monitoring path: /Users/test/Library/Mobile Documents/com~apple~CloudDocs
+🎵 Audio extensions: .m4a, .mp3, .wav, .aac, .flac, .ogg
+⏱️  File stability wait: 5s
+📊 Registry stats: {'total': 5, 'google_drive': 3, 'icloud_drive': 2}
+============================================================
+Press Ctrl+C to stop monitoring
+
+✅ Monitoring active...
+```
+
+#### 動作フロー
+
+1. iCloud Driveに音声ファイルを保存
+2. watchdogが即座に検知（FSEvents）
+3. ファイルサイズが安定するまで待機（iCloud同期完了確認）
+4. SHA-256ハッシュを計算
+5. 統合レジストリで重複チェック
+   - **重複なし** → 文字起こし実行 → レジストリ登録
+   - **重複あり** → スキップ（Google Driveで処理済み）
+6. Phase 10-1でリネーム → レジストリ更新
+
+### 重複検知の仕組み
+
+**シナリオ**: iCloud同期が遅いため、手動でGoogle Driveにアップロードした場合
+
+```
+1. [13:00] Google Driveに手動アップロード
+   → 文字起こし実行
+   → ハッシュ "a1b2c3..." をレジストリ登録
+
+2. [13:30] 同じファイルがiCloud Driveに同期
+   → ハッシュ計算 → "a1b2c3..."
+   → レジストリで重複検知
+   → スキップ（二重処理防止）
+```
+
+### 統合レジストリ形式
+
+`.processed_files_registry.jsonl`（JSONL形式、1行=1エントリ）:
+
+```jsonl
+{"source":"google_drive","file_id":"16BNBa773...","hash":"a1b2c3d4...","original_name":"recording.m4a","renamed_to":"20251015_会議.m4a","local_path":"downloads/20251015_会議.m4a","processed_at":"2025-10-15T16:30:00Z"}
+{"source":"icloud_drive","file_id":null,"hash":"e5f6g7h8...","original_name":"memo.m4a","renamed_to":"20251015_メモ.m4a","local_path":"~/Library/Mobile Documents/.../memo.m4a","processed_at":"2025-10-15T16:35:00Z"}
+```
+
+### スタンドアロンテスト
+
+既存の音声ファイルのハッシュ計算と重複チェック:
+
+```bash
+python unified_registry.py path/to/your_file.m4a
+```
+
+**出力例**:
+```
+Calculating hash for: your_file.m4a
+  Hash: a1b2c3d4e5f6g7h8...
+
+✅ Already processed:
+  Source: google_drive
+  Original: recording.m4a
+  Renamed: 20251015_会議.m4a
+  Processed at: 2025-10-15T16:30:00Z
+
+Registry stats:
+  Total: 10
+  Google Drive: 6
+  iCloud Drive: 4
+```
+
+### 環境変数
+
+| 変数 | デフォルト | 説明 |
+|------|----------|------|
+| `ENABLE_ICLOUD_MONITORING` | `false` | `true`でiCloud監視を有効化 |
+| `ICLOUD_DRIVE_PATH` | `~/Library/Mobile Documents/com~apple~CloudDocs` | iCloud Driveのパス |
+| `PROCESSED_FILES_REGISTRY` | `.processed_files_registry.jsonl` | 統合レジストリのパス |
+
+### Google Drive Webhookとの併用
+
+**推奨運用方法**:
+
+1. **iCloud Driveをメイン**: `icloud_monitor.py`を常時起動
+2. **Google Driveはバックアップ**: iCloud同期が遅い時のみ手動アップロード
+
+**併用時の動作**:
+
+```bash
+# ターミナル1: Google Drive Webhook
+python webhook_server.py
+
+# ターミナル2: iCloud監視
+python icloud_monitor.py
+```
+
+同一ファイルが両方に存在しても、ハッシュベースの重複検知により**1回だけ**処理されます。
+
+### トラブルシューティング
+
+#### iCloud Driveパスが見つからない
+
+```bash
+# iCloud Driveのパス確認
+ls ~/Library/Mobile\ Documents/com~apple~CloudDocs/
+```
+
+- iCloud Driveが有効化されているか確認
+- macOS設定でiCloud Driveの同期が有効か確認
+
+#### ファイルが検知されない
+
+- `ENABLE_ICLOUD_MONITORING=true`に設定されているか確認
+- 監視対象の拡張子か確認（.m4a, .mp3, .wav, .aac, .flac, .ogg）
+- `.processed_files_registry.jsonl`に既にハッシュが記録されていないか確認
+
+#### 重複検知が動作しない
+
+```bash
+# レジストリの内容確認
+cat .processed_files_registry.jsonl | grep "hash"
+```
+
+- ハッシュが正しく計算されているか確認
+- ファイル内容が完全に同一か確認（1バイトでも違えば別ファイル）
+
+### Phase 10-1/10-2との連携
+
+Phase 10-3は既存のPhase 10-1（自動リネーム）とPhase 10-2（自動削除）と完全統合されています：
+
+1. **iCloud Driveファイル検知** → Phase 10-3
+2. **文字起こし実行** → `structured_transcribe.py`
+3. **ローカルファイルリネーム** → Phase 10-1
+4. **レジストリ更新**（リネーム後のファイル名） → Phase 10-3
+5. （Google Driveファイルの場合のみ）**クラウドファイル削除** → Phase 10-2
+
+### 注意事項
+
+- **ファイル安定待機**: iCloud同期中のファイルは最大5分待機します
+- **ハッシュ計算**: 大容量ファイル（>1GB）は数秒かかる場合があります
+- **レジストリは削除不可**: `.gitignore`でGit管理外ですが、手動削除は非推奨
+- **macOS専用**: watchdogはクロスプラットフォームですが、iCloud DriveパスはmacOS専用
+
 ## 今後の拡張候補
 
 MVPで不便を感じた場合のみ追加:

@@ -20,6 +20,9 @@ from dotenv import load_dotenv
 from filelock import FileLock, Timeout
 import time
 
+# Phase 10-3: Unified registry for duplicate detection
+import unified_registry as registry
+
 # Load environment variables
 load_dotenv()
 
@@ -196,17 +199,102 @@ def process_new_files(service, folder_id='root'):
 
                 try:
                     # Download
-                    print(f"[1/3] Downloading...", flush=True)
+                    print(f"[1/4] Downloading...", flush=True)
                     audio_path = download_file(service, file_id, file_name)
                     print(f"  Saved to: {audio_path}", flush=True)
 
+                    # [Phase 10-3] Extract user display name (filename without extension) and check for duplicates
+                    print(f"[2/4] Checking for duplicates...", flush=True)
+                    user_display_name = Path(file_name).stem  # 拡張子なし
+                    print(f"  User display name: {user_display_name}", flush=True)
+
+                    if registry.is_processed(user_display_name):
+                        existing = registry.get_by_display_name(user_display_name)
+                        print(f"  ⚠️ DUPLICATE DETECTED - Already processed:", flush=True)
+                        print(f"    Source: {existing.get('source')}", flush=True)
+                        print(f"    Original: {existing.get('original_name')}", flush=True)
+                        print(f"    Display name: {user_display_name}", flush=True)
+                        print(f"    Processed at: {existing.get('processed_at')}", flush=True)
+                        print(f"  ➡️ Skipping transcription, deleting files (local + cloud)", flush=True)
+
+                        # Delete duplicate downloaded file
+                        if audio_path.exists():
+                            audio_path.unlink()
+                            print(f"  ✅ Local file deleted", flush=True)
+
+                        # [Phase 10-3.1] Delete duplicate file from Google Drive
+                        try:
+                            from cloud_file_manager import (
+                                delete_gdrive_file,
+                                log_deletion,
+                                get_file_size_mb
+                            )
+
+                            # Get file size for logging
+                            file_size_mb = get_file_size_mb(service, file_id)
+
+                            # Delete from Google Drive
+                            delete_gdrive_file(service, file_id, file_name)
+                            print(f"  ✅ Google Drive duplicate file deleted: {file_id}", flush=True)
+
+                            # Log deletion event (with duplicate flag)
+                            log_deletion(
+                                file_info={
+                                    'file_id': file_id,
+                                    'file_name': file_name,
+                                    'original_name': file_name,
+                                    'file_size_mb': file_size_mb,
+                                    'renamed_to': None
+                                },
+                                validation_results={
+                                    'duplicate': True,
+                                    'original_source': existing.get('source'),
+                                    'original_processed_at': existing.get('processed_at')
+                                },
+                                deleted=True,
+                                error=None
+                            )
+                        except Exception as delete_error:
+                            print(f"  ⚠️ Failed to delete duplicate from Google Drive: {delete_error}", flush=True)
+                            # Log deletion failure
+                            try:
+                                log_deletion(
+                                    file_info={
+                                        'file_id': file_id,
+                                        'file_name': file_name,
+                                        'original_name': file_name,
+                                        'file_size_mb': 0,
+                                        'renamed_to': None
+                                    },
+                                    validation_results={'duplicate': True},
+                                    deleted=False,
+                                    error=str(delete_error)
+                                )
+                            except:
+                                pass  # Best effort logging
+
+                        # Mark as processed in old system too
+                        mark_as_processed(file_id)
+                        continue
+
+                    # [Phase 10-3] Register in unified registry before processing
+                    print(f"  📝 Registering to unified registry...", flush=True)
+                    registry.add_to_registry(
+                        source='google_drive',
+                        original_name=file_name,
+                        user_display_name=user_display_name,
+                        renamed_to=None,  # Will be updated after Phase 10-1 renames
+                        file_id=file_id,
+                        local_path=str(audio_path)
+                    )
+
                     # Transcribe
-                    print(f"[2/3] Transcribing and summarizing...", flush=True)
+                    print(f"[3/4] Transcribing and summarizing...", flush=True)
                     output = transcribe_file(audio_path)
                     print(output, flush=True)
 
                     # Mark as processed (before renaming, to prevent duplicate processing)
-                    print(f"[3/3] Marking as processed...", flush=True)
+                    print(f"[4/4] Marking as processed...", flush=True)
                     mark_as_processed(file_id)
                     print(f"  Added to {PROCESSED_FILE}", flush=True)
 

@@ -6,3 +6,4 @@ google-auth-httplib2
 google-auth-oauthlib
 fastapi
 uvicorn[standard]
+watchdog>=4.0.0

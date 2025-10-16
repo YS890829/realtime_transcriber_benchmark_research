@@ -1901,12 +1901,330 @@ PROCESSED_FILES_UNIFIED=.processed_files_unified.json
 - 理由: Phase 10-2でどうせ削除するのでリネーム不要（無駄なAPI呼び出し削減）
 - ローカルリネームのみ実行
 
-**次のアクション**: ✅ Phase 10-1完了 → ✅ Phase 10-2完了 → Phase 10-3（iCloud Drive連携）へ
+**次のアクション**: ✅ Phase 10-1完了 → ✅ Phase 10-2完了 → ✅ Phase 10-3完了
+
+---
+
+### ✅ Phase 10-3 完了: ファイル名ベース重複管理システム
+
+**完了日**: 2025-10-16
+
+**目標**: ハッシュベースからファイル名ベースの重複検知への完全移行
+
+#### 背景と課題
+
+**ハッシュベースの限界**:
+- 同じ音声コンテンツでもエンコード方法が異なるとハッシュ値が変わる
+- iPhone→iCloud: `.qta` → FFmpeg変換 → `.m4a`
+- iPhone→Google Drive: 直接`.m4a`エクスポート
+- 結果: 同一音声でも異なるハッシュ値が生成され、重複検知が機能しない
+
+**解決策**: ユーザーが設定した表示名（ファイル名）をプライマリキーとして使用
+
+#### 完了タスク
+
+- [x] **unified_registry.py大幅リファクタリング**
+  - [x] `calculate_file_hash()` 関数削除
+  - [x] `hashlib` import削除
+  - [x] 全関数を `file_hash` から `user_display_name` に変更
+  - [x] `is_processed(user_display_name)`: ユーザー表示名で処理済みチェック
+  - [x] `get_by_display_name(user_display_name)`: ユーザー表示名でエントリ取得
+  - [x] `add_to_registry()`: `file_hash` → `user_display_name` パラメータ変更
+
+- [x] **icloud_monitor.py修正**
+  - [x] `sqlite3` import追加
+  - [x] `get_user_display_name()` 関数追加: CloudRecordings.db統合
+  - [x] SQLクエリ実装: `SELECT ZENCRYPTEDTITLE FROM ZCLOUDRECORDING WHERE ZPATH = ?`
+  - [x] ハッシュ計算コード削除
+  - [x] 重複チェックを `user_display_name` ベースに変更
+
+- [x] **webhook_server.py修正**
+  - [x] ハッシュ計算コード削除
+  - [x] `user_display_name = Path(file_name).stem` で抽出
+  - [x] 重複チェックを `user_display_name` ベースに変更
+
+- [x] **レジストリマイグレーション**
+  - [x] 既存6エントリを新形式に変換（hash → user_display_name）
+  - [x] バックアップ作成: `.processed_files_registry.jsonl.backup_hash`
+
+#### レジストリ構造変更
+
+**旧形式（ハッシュベース）**:
+```json
+{
+  "source": "icloud_drive",
+  "file_id": null,
+  "hash": "39ff18086ec669e8...",
+  "original_name": "20251016 101544-FDB5F872.qta",
+  "renamed_to": "20251015_まなちゃん発話速度の指摘と前向きな受容",
+  "local_path": "/path/to/file.m4a",
+  "processed_at": "2025-10-16T01:16:11.123456+00:00"
+}
+```
+
+**新形式（ファイル名ベース）**:
+```json
+{
+  "source": "icloud_drive",
+  "file_id": null,
+  "user_display_name": "Seven Eleven Soka Kitaya 1Chome-Shop 6",
+  "original_name": "20251016 111531-F16BE7B5.qta",
+  "renamed_to": "20251016_セブンイレブン草加北谷店調査",
+  "local_path": "/path/to/file.m4a",
+  "processed_at": "2025-10-16T02:16:28.672725+00:00"
+}
+```
+
+#### テスト結果
+
+**Test ①: iCloud自動文字起こし** ✅
+```
+Shop 6:
+  実ファイル名: 20251016 111531-F16BE7B5.qta
+  CloudRecordings.db ZENCRYPTEDTITLE: Seven Eleven Soka Kitaya 1Chome-Shop 6
+  処理: 成功（文字起こし→要約→リネーム→Voice Memosフォルダ削除）
+
+Shop 7:
+  実ファイル名: 20251016 111620-0D29006D.qta
+  CloudRecordings.db ZENCRYPTEDTITLE: Seven Eleven Soka Kitaya 1Chome-Shop 7
+  処理: 成功（文字起こし→要約→リネーム→Voice Memosフォルダ削除）
+```
+
+**Test ②: Google Drive重複検知** ✅
+```
+Shop 6 Google Driveアップロード:
+  [1/4] Downloading: downloads/Seven Eleven Soka Kitaya 1Chome-Shop 6.m4a
+  [2/4] Checking for duplicates...
+    User display name: Seven Eleven Soka Kitaya 1Chome-Shop 6
+    ⚠️ DUPLICATE DETECTED - Already processed:
+      Source: icloud_drive
+      Original: 20251016 111531-F16BE7B5.qta
+      Processed at: 2025-10-16T02:16:28.672725+00:00
+    ➡️ Skipping transcription, deleting downloaded file
+
+Shop 7 Google Driveアップロード:
+  [1/4] Downloading: downloads/Seven Eleven Soka Kitaya 1Chome-Shop 7.m4a
+  [2/4] Checking for duplicates...
+    User display name: Seven Eleven Soka Kitaya 1Chome-Shop 7
+    ⚠️ DUPLICATE DETECTED - Already processed:
+      Source: icloud_drive
+      Original: 20251016 111620-0D29006D.qta
+      Processed at: 2025-10-16T02:16:54.107628+00:00
+    ➡️ Skipping transcription, deleting downloaded file
+```
+
+#### Webhook問題の解決
+
+**問題**: webhook通知が `/webhook/webhook` エンドポイントに送信され404エラー
+
+**原因**: `/setup` エンドポイントに渡す `webhook_url` パラメータが間違っていた
+```
+❌ 間違い: https://6b11c38165f6.ngrok-free.app/webhook
+✅ 正解: https://6b11c38165f6.ngrok-free.app
+```
+
+**解決**: webhook再登録
+```bash
+curl -s "https://6b11c38165f6.ngrok-free.app/setup?webhook_url=https://6b11c38165f6.ngrok-free.app"
+```
+
+**結果**: チャネルID `channel-20251016022938` で正常動作確認
+
+#### 達成された機能要件
+
+1. ✅ **ファイル名ベース重複管理**: `user_display_name` をプライマリキーとして使用
+2. ✅ **CloudRecordings.db統合**: iCloud Voice Memosのユーザー表示名を正確に取得
+3. ✅ **クロスソース重複検知**: iCloud ↔ Google Drive間で重複を検知
+4. ✅ **Webhook自動通知**: Google Driveアップロード時に自動処理トリガー
+5. ✅ **ハッシュコード削除**: 不要なハッシュ計算コードを完全削除
+
+#### 技術的な教訓
+
+**ファイル名ベースの利点**:
+- ユーザーが設定した表示名は両方のルートで同一
+- CloudRecordings.dbから取得可能（`ZENCRYPTEDTITLE` フィールド）
+- シンプルで信頼性の高い重複検知
+- エンコード方法に依存しない
+
+**CloudRecordings.db統合**:
+- パス: `~/Library/Application Support/com.apple.voicememos/CloudRecordings.db`
+- SQLクエリ: `SELECT ZENCRYPTEDTITLE FROM ZCLOUDRECORDING WHERE ZPATH = ?`
+- 実ファイル名（例: `20251016 111531-F16BE7B5.qta`）→ユーザー表示名取得
+
+**Phase 10-3 完了判定**: ✅✅✅ **全機能完全動作確認済み（エンドツーエンドテスト完了）**
+
+---
+
+### ✅ Phase 10-3.1 完了: 重複ファイルのGoogle Drive自動削除
+
+**完了日**: 2025-10-16
+
+**目標**: 重複検知されたファイルもGoogle Driveから自動削除する
+
+#### 背景と課題
+
+Phase 10-3実装後、重複ファイルの処理に不完全な点が発見されました：
+
+**Phase 10-3の動作**:
+- ✅ 重複検知成功（ファイル名ベース）
+- ✅ ローカルダウンロードファイル削除
+- ❌ **Google Driveファイルは残ったまま** ← 問題
+
+**通常ファイルの動作（Phase 10-2実装済み）**:
+- ✅ 文字起こし・要約完了
+- ✅ JSON検証合格
+- ✅ **Google Driveから削除**
+
+**求められる動作**: 重複ファイルも通常ファイルと同様にGoogle Driveから削除すべき
+
+#### 完了タスク
+
+- [x] **webhook_server.py修正** (211-278行目)
+  - [x] 重複検知ブロックにGoogle Drive削除処理追加
+  - [x] `cloud_file_manager` モジュールのインポート追加
+  - [x] `delete_gdrive_file()` 呼び出し追加
+  - [x] `log_deletion()` 呼び出し追加（重複フラグ付き）
+  - [x] エラーハンドリング追加（削除失敗時もログ記録）
+
+#### 実装内容
+
+**変更前（Phase 10-3）**:
+```python
+if registry.is_processed(user_display_name):
+    # 重複検知
+    print(f"  ➡️ Skipping transcription, deleting downloaded file")
+
+    # ローカルファイル削除のみ
+    if audio_path.exists():
+        audio_path.unlink()
+
+    mark_as_processed(file_id)
+    continue
+```
+
+**変更後（Phase 10-3.1）**:
+```python
+if registry.is_processed(user_display_name):
+    # 重複検知
+    print(f"  ➡️ Skipping transcription, deleting files (local + cloud)")
+
+    # ローカルファイル削除
+    if audio_path.exists():
+        audio_path.unlink()
+        print(f"  ✅ Local file deleted")
+
+    # Google Drive削除（新規追加）
+    try:
+        from cloud_file_manager import delete_gdrive_file, log_deletion, get_file_size_mb
+
+        file_size_mb = get_file_size_mb(service, file_id)
+        delete_gdrive_file(service, file_id, file_name)
+        print(f"  ✅ Google Drive duplicate file deleted: {file_id}")
+
+        # 削除ログ記録（重複フラグ付き）
+        log_deletion(
+            file_info={...},
+            validation_results={
+                'duplicate': True,
+                'original_source': existing.get('source'),
+                'original_processed_at': existing.get('processed_at')
+            },
+            deleted=True,
+            error=None
+        )
+    except Exception as delete_error:
+        print(f"  ⚠️ Failed to delete duplicate from Google Drive: {delete_error}")
+        # 削除失敗もログ記録
+
+    mark_as_processed(file_id)
+    continue
+```
+
+#### テスト結果
+
+**テスト内容**: Shop 6とShop 7を再度Google Driveにアップロード
+
+**Shop 6処理ログ**:
+```
+[Processing] Seven Eleven Soka Kitaya 1Chome-Shop 6.m4a (ID: 16_BEq07vd_5JIIruXJtRbzZkhr6ZFRLL)
+[1/4] Downloading...
+  Saved to: downloads/Seven Eleven Soka Kitaya 1Chome-Shop 6.m4a
+[2/4] Checking for duplicates...
+  User display name: Seven Eleven Soka Kitaya 1Chome-Shop 6
+  ⚠️ DUPLICATE DETECTED - Already processed:
+    Source: icloud_drive
+    Original: 20251016 111531-F16BE7B5.qta
+    Processed at: 2025-10-16T02:16:28.672725+00:00
+  ➡️ Skipping transcription, deleting files (local + cloud)
+  ✅ Local file deleted
+  ✅ Google Drive duplicate file deleted: 16_BEq07vd_5JIIruXJtRbzZkhr6ZFRLL
+  📝 Deletion log recorded: .deletion_log.jsonl
+```
+
+**Shop 7処理ログ**:
+```
+[Processing] Seven Eleven Soka Kitaya 1Chome-Shop 7.m4a (ID: 1J5W5eIgwc_I4qjvW7-osQ_vifpxHR6tJ)
+[1/4] Downloading...
+  Saved to: downloads/Seven Eleven Soka Kitaya 1Chome-Shop 7.m4a
+[2/4] Checking for duplicates...
+  User display name: Seven Eleven Soka Kitaya 1Chome-Shop 7
+  ⚠️ DUPLICATE DETECTED - Already processed:
+    Source: icloud_drive
+    Original: 20251016 111620-0D29006D.qta
+    Processed at: 2025-10-16T02:16:54.107628+00:00
+  ➡️ Skipping transcription, deleting files (local + cloud)
+  ✅ Local file deleted
+  ✅ Google Drive duplicate file deleted: 1J5W5eIgwc_I4qjvW7-osQ_vifpxHR6tJ
+  📝 Deletion log recorded: .deletion_log.jsonl
+```
+
+**削除ログ例（Shop 7）**:
+```json
+{
+  "timestamp": "2025-10-16T02:43:26.840075+00:00",
+  "file_id": "16_BEq07vd_5JIIruXJtRbzZkhr6ZFRLL",
+  "file_name": "Seven Eleven Soka Kitaya 1Chome-Shop 7.m4a",
+  "validation_passed": false,
+  "validation_details": {
+    "duplicate": true,
+    "original_source": "icloud_drive",
+    "original_processed_at": "2025-10-16T02:16:54.107628+00:00"
+  },
+  "deleted": true,
+  "error": null
+}
+```
+
+**Google Drive確認結果**: Shop 6とShop 7が削除され、残っていないことを確認 ✅
+
+#### 達成された機能要件
+
+1. ✅ **重複ファイルのGoogle Drive自動削除**: 重複検知時もGoogle Driveから削除
+2. ✅ **削除ログ記録**: 重複フラグ、元ソース情報を含むログ記録
+3. ✅ **エラーハンドリング**: 削除失敗時もログ記録（ベストエフォート）
+4. ✅ **完全な処理フロー**: 通常ファイルと重複ファイルで同じ最終状態（Google Driveから削除）
+
+#### 重複ファイルの完全な処理フロー
+
+1. ✅ Google Driveにアップロード
+2. ✅ Webhook通知受信
+3. ✅ ダウンロード実行
+4. ✅ 重複検知（`user_display_name`ベース）
+5. ✅ ローカルファイル削除
+6. ✅ **Google Driveファイル削除**（Phase 10-3.1の新機能）
+7. ✅ **削除ログ記録**（重複フラグ、元ソース情報付き）
+8. ✅ `.processed_drive_files.txt`記録
+
+**Phase 10-3.1 完了判定**: ✅✅✅ **全機能動作確認済み（エンドツーエンドテスト完了）**
+
+**次のアクション**: ✅ Phase 10完全完了（Phase 10-1 + 10-2 + 10-3 + 10-3.1）
 
 ---
 
 ## 更新履歴
 
+- **2025-10-16**: ✅✅✅ Phase 10-3.1完全完了（重複ファイルのGoogle Drive自動削除：重複検知時もクラウド削除、削除ログ記録、エンドツーエンドテスト完了）
+- **2025-10-16**: ✅✅✅ Phase 10-3完全完了（ファイル名ベース重複管理システム：CloudRecordings.db統合、ハッシュベース削除、クロスソース重複検知、エンドツーエンドテスト完了）
 - **2025-10-15**: ✅✅✅ Phase 10-2完全完了（クラウドファイル自動削除：5項目検証、Google Drive削除、JSONL形式ログ記録、全フロー動作確認済み）
 - **2025-10-15**: ✅✅✅ Phase 10-1完全完了（自動ファイル名変更：Gemini API統合、ローカル+Google Drive両方リネーム成功、全フロー動作確認済み → Phase 10-2実装時にGoogle Driveリネーム削除）
 - **2025-10-15**: Phase 10計画完了（iCloud Drive連携＋自動ファイル名変更＋クラウドファイル自動削除の実現可能性検証、実装順序決定）
