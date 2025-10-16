@@ -26,16 +26,21 @@ Google Drive / iCloud Drive / ローカル音声ファイル
 [Phase 1] 文字起こし (structured_transcribe.py)
     ↓ _structured.json (Speaker 1/2, segments, timestamps, Gemini Audio API)
     ↓
-[Phase 2] 話者推論 (infer_speakers.py)
-    ↓ _structured_with_speakers.json (Sugimoto/Other, confidence)
+[Phase 11-3] 参加者DB統合 + 話者推論・要約強化 (integrated_pipeline.py)
+    ├─ カレンダーイベントマッチング
+    ├─ 参加者情報抽出 (extract_participants.py)
+    ├─ 参加者DB検索・更新 (participants_db.py)
+    ├─ 話者推論統合版 (enhanced_speaker_inference.py)
+    └─ 要約生成（参加者DBコンテキスト統合）
+    ↓ _structured.json updated (speaker_name, 参加者DB情報)
     ↓
-[Phase 3] トピック・エンティティ抽出 (add_topics_entities.py)
-    ↓ _enhanced.json (topics, entities)
-    ↓
-[Phase 4] エンティティ統一 (entity_resolution_llm.py)
-    ↓ _enhanced.json updated (canonical_name, entity_id)
-    ↓
-[Phase 5] 統合Vector DB構築 (build_unified_vector_index.py)
+[Phase 2-6] バッチ処理 (run_phase_2_6_batch.py)
+    ├─ Phase 2: スキップ（Phase 11-3で実行済み）
+    ├─ Phase 3: トピック・エンティティ抽出 (add_topics_entities.py)
+    ├─ Phase 4: エンティティ統一 (entity_resolution_llm.py)
+    ├─ Phase 5: 統合Vector DB構築 (build_unified_vector_index.py)
+    └─ Phase 6: スキップ（学習データ蓄積優先）
+    ↓ _enhanced.json (topics, entities, canonical_name, entity_id)
     ↓ ChromaDB: transcripts_unified (複数ファイル統合)
     ↓
 [Phase 6] 検索・RAG (semantic_search.py / rag_qa.py)
@@ -49,14 +54,17 @@ Google Drive / iCloud Drive / ローカル音声ファイル
 
 ### 主要な技術的特徴
 
-1. **多層パイプライン構造**: 6つの独立したフェーズで段階的に情報を付加
-2. **クラウド統合**: Google Drive + iCloud Driveの自動監視・重複検知
-3. **API Tier切り替え**: FREE/PAID tierを環境変数で切り替え可能
-4. **統合Vector DB**: 複数ファイルを1つのコレクションに統合（クエリ数80%削減）
-5. **エンティティ統一**: canonical_nameとentity_idで全ファイル横断の一意性を保証
-6. **自動ファイル管理**: スマートリネーム、クラウド削除、レジストリ管理
-7. **レート制限対応**: 各APIの制限に応じた待機処理実装
-8. **エラーハンドリング**: JSON修復、フォールバック処理
+1. **多層パイプライン構造**: 8つの独立したフェーズで段階的に情報を付加
+2. **参加者DB統合**: Google Calendarと連携し、参加者情報を構造化データベースで管理
+3. **話者推論強化**: カレンダー参加者情報により話者特定精度向上（medium→high）
+4. **クラウド統合**: Google Drive + iCloud Driveの自動監視・重複検知
+5. **API Tier切り替え**: FREE/PAID tierを環境変数で切り替え可能
+6. **統合Vector DB**: 複数ファイルを1つのコレクションに統合（クエリ数80%削減）
+7. **エンティティ統一**: canonical_nameとentity_idで全ファイル横断の一意性を保証
+8. **自動ファイル管理**: スマートリネーム、クラウド削除、レジストリ管理
+9. **バッチ処理自動化**: Phase 3-6の自動実行により手動作業90%削減
+10. **レート制限対応**: 各APIの制限に応じた待機処理実装
+11. **エラーハンドリング**: JSON修復、フォールバック処理
 
 ---
 
@@ -904,7 +912,10 @@ python generate_optimal_filename.py "downloads/recording_structured_summarized.j
 | Phase | スクリプト | モデル | 用途 |
 |-------|-----------|--------|------|
 | Phase 1 | structured_transcribe.py | Gemini 2.5 Flash | 音声文字起こし + 話者識別 |
-| Phase 2 | infer_speakers.py | Gemini 2.5 Pro | 話者推論（LLM判定） |
+| Phase 11-3 | integrated_pipeline.py (Step 2) | Gemini 2.0 Flash | カレンダーイベントマッチング |
+| Phase 11-3 | extract_participants.py (Step 3) | Gemini 2.0 Flash | 参加者情報抽出 |
+| Phase 11-3 | enhanced_speaker_inference.py (Step 5) | Gemini 2.5 Pro | 話者推論（カレンダー統合版） |
+| Phase 11-3 | summary_generator.py (Step 6) | Gemini 2.5 Pro | 要約生成（参加者DB統合版） |
 | Phase 3 | add_topics_entities.py | Gemini 2.0 Flash | トピック・エンティティ抽出 |
 | Phase 4 | entity_resolution_llm.py | Gemini 2.5 Pro | エンティティ名寄せ |
 | Phase 5 | build_unified_vector_index.py | text-embedding-004 | ベクトル化（768次元） |
@@ -1282,6 +1293,154 @@ python icloud_monitor.py
 ```
 
 **所要時間**: リアルタイム監視（常駐プロセス）
+
+---
+
+### Phase 11-3: 参加者DB統合 + Phase 2-6自動パイプライン
+
+Phase 11-3は、Google Calendarと連携した参加者データベース管理と、Phase 2-6の自動バッチ処理を実装します。
+
+**主要コンポーネント**:
+
+1. **integrated_pipeline.py** (280行) - メインパイプライン（8ステップ）
+2. **participants_db.py** (260行) - 参加者DB CRUD API
+3. **extract_participants.py** (217行) - カレンダーからの参加者抽出
+4. **enhanced_speaker_inference.py** (302行) - カレンダー統合話者推論
+5. **run_phase_2_6_batch.py** (204行) - Phase 3-6バッチ処理
+
+**Phase 11-3パイプライン（リアルタイム処理）**:
+
+```python
+# 実行例
+python integrated_pipeline.py downloads/meeting_20251016_structured.json
+
+# 処理フロー
+# Step 1: JSON読み込み（Phase 1出力）
+# Step 2: カレンダーイベントマッチング（LLM① Gemini 2.0 Flash）
+# Step 3: 参加者抽出（LLM② Gemini 2.0 Flash）
+# Step 4: 参加者DB検索（過去情報取得）
+# Step 5: 話者推論（LLM③ Gemini 2.5 Pro、カレンダー統合版）
+# Step 6: 要約生成（LLM④ Gemini 2.5 Pro、参加者DB統合）
+# Step 7: 参加者DB更新（UPSERT）
+# Step 8: 会議情報登録
+```
+
+**参加者データベース構造**:
+
+```sql
+-- participants テーブル
+CREATE TABLE participants (
+    participant_id TEXT PRIMARY KEY,
+    canonical_name TEXT NOT NULL,
+    display_names TEXT,  -- JSON配列: ["田中", "田中部長", "田中さん"]
+    organization TEXT,
+    role TEXT,
+    email TEXT,
+    notes TEXT,
+    meeting_count INTEGER DEFAULT 0,
+    first_seen_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- meetings テーブル
+CREATE TABLE meetings (
+    meeting_id TEXT PRIMARY KEY,
+    event_id TEXT,
+    title TEXT NOT NULL,
+    date DATE,
+    summary TEXT,
+    json_file_path TEXT
+);
+
+-- participant_meetings テーブル（中間テーブル）
+CREATE TABLE participant_meetings (
+    participant_id TEXT,
+    meeting_id TEXT,
+    role_in_meeting TEXT,
+    PRIMARY KEY (participant_id, meeting_id)
+);
+```
+
+**UPSERT機能**:
+- 新規参加者: INSERT
+- 既存参加者: display_names マージ、notes追記、meeting_count インクリメント
+
+**話者推論の精度向上**:
+```python
+# カレンダー情報なし
+{
+  "sugimoto_speaker": "Speaker 1",
+  "participants_mapping": {"Speaker 0": "Unknown", "Speaker 1": "杉本"},
+  "confidence": "medium"
+}
+
+# カレンダー情報あり
+{
+  "sugimoto_speaker": "Speaker 1",
+  "participants_mapping": {"Speaker 0": "田中", "Speaker 1": "杉本"},
+  "confidence": "high",
+  "reasoning": "カレンダー情報により田中部長の参加が確認されたため"
+}
+```
+
+**Phase 2-6バッチ処理（非同期実行）**:
+
+```bash
+# 全ファイル一括処理
+python run_phase_2_6_batch.py downloads
+
+# 処理内容
+# Phase 2: スキップ（Phase 11-3で実行済み）
+# Phase 3: トピック/エンティティ抽出（LLM⑤ Gemini 2.0 Flash）
+# Phase 4: エンティティ解決（LLM⑤内で実行）
+# Phase 5: Vector DB構築
+# Phase 6: RAG検証（スキップ、学習データ蓄積優先）
+```
+
+**LLM呼び出し戦略**:
+- リアルタイム: 4回（Step 2, 3, 5, 6）→ 18-28秒
+- バッチ: 1回/ファイル（Phase 3）→ 5-8秒/ファイル
+
+**処理時間（12ファイル実績）**:
+- Phase 11-3（リアルタイム）: 約24秒/ファイル
+- Phase 3（バッチ）: 約1.3分（12ファイル）
+- Phase 4（バッチ）: 約12秒（全体）
+- Phase 5（バッチ）: 約25秒（全体）
+- **合計**: 約2分（目標15分以内）
+
+**成果指標**:
+- 参加者抽出精度: Precision 100%（目標90%超）
+- バッチ処理成功率: 100%（12/12ファイル）
+- 話者推論精度向上: medium → high
+- 手動作業削減: 90%
+
+**環境変数**:
+```bash
+GEMINI_API_KEY_FREE=your_api_key
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+PARTICIPANTS_DB_PATH=participants.db
+```
+
+**実行例**:
+```bash
+# リアルタイム処理（Phase 11-3）
+python integrated_pipeline.py downloads/meeting_20251016_structured.json
+
+# バッチ処理（Phase 3-6）
+python run_phase_2_6_batch.py downloads
+
+# 参加者DB確認
+sqlite3 participants.db "SELECT * FROM participants;"
+```
+
+**詳細ドキュメント**:
+- [Phase 11-3アーキテクチャ設計書](./phase-11-3-architecture.md)
+- [Phase 11-3検証レポート](./phase-11-3-validation.md)
+
+**所要時間**:
+- Phase 11-3: 18-28秒/ファイル（リアルタイム）
+- Phase 2-6バッチ: 約2分/12ファイル（非同期）
 
 ---
 
