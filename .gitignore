@@ -32,8 +32,12 @@ output/
 # Google Drive API (Phase 5)
 credentials.json
 token.json
+token.json.*
 downloads/
 .processed_drive_files.txt
+
+# Voice Memos Database (Phase 10-3)
+CloudRecordings.db
 
 # Phase 10-2 (Cloud File Auto-deletion)
 .deletion_log.jsonl
