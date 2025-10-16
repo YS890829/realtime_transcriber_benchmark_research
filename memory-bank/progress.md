@@ -2404,116 +2404,132 @@ tail -f /tmp/transcription-webhook.log
 
 ---
 
-### Phase 11-1: Googleカレンダー連携による文脈情報統合（優先度: 高）
+### Phase 11-1: Googleカレンダー連携（予定マッチング + 要約生成統合）（優先度: 高）
 
-**目標**: Googleカレンダーの該当予定の「メモ」フィールドから文脈情報を取得し、文字起こし精度を向上させる。
+**目標**: 音声ファイル作成日のGoogleカレンダー予定と文字起こし内容をLLMでマッチングし、予定情報（タイトル、メモ、参加者）を統合した高精度な要約を生成する。
 
-**背景**: 2025年の業界標準機能。文脈情報活用により:
-- WER（単語誤り率）30-54%削減
-- 話者識別精度15-27%向上
-- 専門用語認識30-40%向上
+**背景**:
+- iCloud/Google Drive両方に対応（録音時刻が不明でも日付ベースで動作）
+- 完全自動化（手動操作不要、突発的な録音にも対応）
+- LLMによる内容ベースの予定マッチング（時刻情報なしでも高精度）
+- 予定情報を活用した要約生成（コンテキストの豊富化）
 
-**実装工数**: 2日
+**実装工数**: 2-3日
 
 **完了条件**:
-- [ ] `calendar_integration.py` 実装
-- [ ] Google Calendar API認証
-- [ ] ファイル作成時刻ベースでイベント検索（±30分）
-- [ ] イベントの「メモ」フィールド取得
-- [ ] `structured_transcribe.py`にプロンプト統合
+- [ ] `calendar_integration.py` 実装（認証、予定取得、マッチング）
+- [ ] `summary_generator.py` 実装（予定情報統合版要約生成）
+- [ ] Google Calendar API認証（token.jsonにCalendar.readonly追加）
+- [ ] 音声ファイル作成日の予定を全件取得
+- [ ] LLMによる予定マッチング（内容ベース）
+- [ ] `structured_transcribe.py`にパイプライン統合
 - [ ] 環境変数 `ENABLE_CALENDAR_INTEGRATION` でON/OFF切り替え
-- [ ] 5ファイルでテスト成功（カレンダーメモあり/なし両方）
+- [ ] 5ファイルでテスト成功（iCloud、Google Drive、予定あり/なし）
 
-**実装内容**:
+**実装アプローチ**:
 
-1. **calendar_integration.py（新規、約200行）**
-   ```python
-   主要機能:
-   - Google Calendar API認証
-   - 時刻ベースでイベント検索
-   - イベントの「メモ」（description）フィールド取得
-   - キャッシュ管理（.context_cache/）
-   ```
+1. **日付ベースの予定取得（時刻不要）**
+   - 音声ファイル作成日（YYYYMMDD）を取得
+     - 優先1: ファイル名から抽出（`20251016_description.m4a`）
+     - 優先2: `st_ctime`から取得
+   - その日（00:00:00 〜 23:59:59）の予定を全件取得
+   - 録音時刻±30分での絞り込みは不要（LLMが内容で判断）
 
-2. **structured_transcribe.py（既存拡張）**
-   ```python
-   追加機能:
-   - --calendar-match オプション追加
-   - ファイル作成時刻の取得（os.path.getmtime）
-   - カレンダーイベント自動検索
-   - メモ内容をプロンプトに埋め込み
-   ```
+2. **LLMによる予定マッチング**
+   - 入力: 文字起こし全文（冒頭3000文字）+ その日の予定リスト全件
+   - モデル: Gemini 2.0 Flash（軽量・安価）
+   - 出力: マッチした予定、信頼度スコア、判断理由
+   - 閾値: 信頼度0.7以上で採用、それ以外は「該当なし」
 
-3. **該当予定の判断ロジック**
-   ```
-   1. 音声ファイルの作成時刻を取得
-   2. Googleカレンダーから時刻±30分の予定を検索
-   3. 該当予定の「メモ」フィールドを取得
-   4. メモ内容を文字起こしプロンプトに統合
-   ```
+3. **要約生成の最適化（2回→1回に統合）**
+   - 旧方式: 文字起こし → 要約生成（予定情報なし）→ 予定マッチング → 要約再生成（予定情報あり）
+   - 新方式: 文字起こし → 予定マッチング → 要約生成（予定情報あり）
+   - メリット: LLMコスト削減、処理時間短縮、高精度要約のみ生成
 
-4. **処理フロー**
-   ```
-   structured_transcribe.py実行
-       ↓
-   ファイル作成時刻取得
-       ↓
-   calendar_integration.py呼び出し
-       ├─ 時刻±30分でイベント検索
-       └─ 該当イベントの「メモ」取得
-       ↓
-   プロンプトに文脈情報追加:
-   【会議メモ】
-   {カレンダーのメモ内容}
+4. **要約生成の入力内容**
+   - 入力: 文字起こし全文 + カレンダー予定情報（タイトル、メモ、時刻、参加者）
+   - 除外: 既存の要約（精度が低いため使用しない）
+   - モデル: Gemini 2.5 Flash（既存の要約生成と同じ）
+   - フォールバック: 予定がない場合は予定情報なしで生成
 
-   上記の情報を考慮して文字起こしを実行してください。
-       ↓
-   Gemini API呼び出し（文脈情報付き）
-   ```
+**処理フロー**:
+```
+[Phase 1] 文字起こし（Gemini 2.0 Flash）
+    ↓
+[Phase 10-1] リネーム
+    ↓
+[Phase 11-1] カレンダー連携
+    ├─ Stage 2: 音声ファイル作成日を取得（YYYYMMDD）
+    ├─ Stage 1: その日の予定を全件取得（Calendar API）
+    ├─ Stage 4: 予定マッチング（Gemini 2.0 Flash、内容ベース）
+    │   - 入力: 文字起こし全文 + 予定リスト
+    │   - 出力: マッチした予定、信頼度、理由
+    └─ Stage 5: 要約生成（Gemini 2.5 Flash、予定情報統合）
+        - 入力: 文字起こし全文 + マッチした予定情報
+        - 出力: 高精度要約（概要、トピック、アクションアイテム、キーワード）
+    ↓
+[Phase 10-4] Google Docs作成
+```
+
+**実装ファイル**:
+
+1. **calendar_integration.py（新規）**
+   - `authenticate_calendar_service()`: OAuth2認証
+   - `get_file_date(file_path)`: 音声ファイルから日付取得（YYYYMMDD）
+   - `get_events_for_file_date(date_str)`: 指定日の予定を全件取得
+   - `format_events(events)`: 予定リストをLLM入力用フォーマットに変換
+   - `match_event_with_transcript(transcript_text, calendar_events)`: LLMによる予定マッチング
+
+2. **summary_generator.py（新規）**
+   - `generate_summary_with_calendar(segments, matched_event)`: 予定情報統合版要約生成
+   - フォールバック処理（予定なし時は予定情報なしで要約生成）
+
+3. **structured_transcribe.py（既存修正）**
+   - Phase 11-1統合（文字起こし後、リネーム後に実行）
+   - 既存の要約生成を条件分岐でスキップ（ENABLE_CALENDAR_INTEGRATION=true時）
+   - JSONメタデータに `matched_calendar_event` フィールド追加
 
 **環境変数追加**:
 ```bash
 # Phase 11-1: カレンダー連携
 ENABLE_CALENDAR_INTEGRATION=false
-GOOGLE_CALENDAR_SCOPES=https://www.googleapis.com/auth/calendar.readonly
-CALENDAR_TOKEN_PATH=calendar_token.json
-CALENDAR_SEARCH_WINDOW_MINUTES=30
+CALENDAR_ID=primary
 ```
 
-**使用例**:
-```bash
-# カレンダー連携なし（既存動作）
-python structured_transcribe.py meeting.m4a
-
-# カレンダー連携あり
-python structured_transcribe.py meeting.m4a --calendar-match
-```
-
-**カレンダーメモの書き方（推奨）**:
-```
-【参加者】
-- 山田太郎（営業部長）
-- 田中花子（マーケティング）
-
-【トピック】
-- Q4戦略レビュー
-- 新製品ローンチ計画
-
-【専門用語】
-- CloudSync API
-- KPI: CAC, LTV
+**JSONメタデータ出力例**:
+```json
+{
+  "matched_calendar_event": {
+    "event": {
+      "summary": "営業ミーティング",
+      "start": {"dateTime": "2025-10-16T14:00:00+09:00"},
+      "end": {"dateTime": "2025-10-16T15:00:00+09:00"},
+      "description": "Q4戦略レビュー",
+      "attendees": ["tanaka@example.com", "yamada@example.com"]
+    },
+    "confidence_score": 0.85,
+    "reasoning": "文字起こし内容に「Q4」「戦略」というキーワードがあり、参加者名も一致"
+  },
+  "summary": {
+    "summary": "営業ミーティング（参加者：田中様、山田様）でのQ4戦略レビュー...",
+    "topics": ["Q4戦略", "売上目標", "新製品ローンチ"],
+    "action_items": ["次回までに資料作成", "予算案提出"],
+    "keywords": ["Q4", "戦略", "営業", "目標", "新製品"]
+  }
+}
 ```
 
 **期待効果**:
-- 会議録音の話者識別が劇的に向上
-- 専門用語（API名、製品名など）の誤認識が減少
-- 議事録としての完成度向上
-- カレンダーに事前情報を書くだけで精度向上
+- iCloud/Google Drive両方で動作（日付のみで予定検索可能）
+- 完全自動化（ユーザーは通常通りボイスメモを録音するだけ）
+- 予定情報を活用した高精度要約（タイトル、メモ、参加者を反映）
+- LLMコスト最適化（要約生成1回のみ）
 
 **注意事項**:
-- Calendar API認証が必要（token.jsonと別にcalendar_token.json）
-- 時刻マッチングの精度（±30分で妥当か確認）
-- メモフィールドが空の場合は通常の文字起こしを実行
+- Calendar API認証が必要（token.jsonにCalendar.readonly scope追加）
+- 予定が複数ある日でも、LLMが内容から最適な予定を推論
+- 予定が見つからない場合は通常の要約を生成（エラーにしない）
+- Calendar API障害時はフォールバック（予定情報なしで動作）
 
 ---
 
