@@ -53,7 +53,7 @@ Step 6: 要約生成
 
 ### 修正1: meeting_date取得を音声ファイル作成日時から取得
 
-#### ファイル: `src/step2_participants/integrated_pipeline.py`
+#### ファイル: [src/pipeline/integrated_pipeline.py](../src/pipeline/integrated_pipeline.py)
 
 **変更前**:
 ```python
@@ -112,7 +112,7 @@ print(f"  ✓ エンティティ抽出完了: {len(entities_people)} 人物")
 ```
 
 **活用する既存関数**:
-- `src/step3_topics/add_topics_entities.py::extract_topics_and_entities()`
+- [src/topics/add_topics_entities.py](../src/topics/add_topics_entities.py)::extract_topics_and_entities()
 
 #### Step 6: エンティティ解決（新規追加）
 
@@ -135,7 +135,7 @@ print(f"  ✓ エンティティ解決完了: {len(resolved_people)} 人物（�
 
 #### Step 7: 話者推論（entities.people活用）- 強化
 
-**ファイル**: `src/step2_participants/enhanced_speaker_inference.py`
+**ファイル**: [src/participants/enhanced_speaker_inference.py](../src/participants/enhanced_speaker_inference.py)
 
 **関数シグネチャ変更**:
 ```python
@@ -183,7 +183,7 @@ prompt = f"""以下は録音された会話の文字起こしです。
 
 ### 修正3: Phase 11-4（Vector DB構築）自動実行
 
-#### ファイル: `src/step1_transcribe/structured_transcribe.py`
+#### ファイル: [src/transcription/structured_transcribe.py](../src/transcription/structured_transcribe.py)
 
 **追加コード**:
 ```python
@@ -198,7 +198,7 @@ if os.getenv('ENABLE_INTEGRATED_PIPELINE', 'true').lower() == 'true':
 # [Phase 11-4] Vector DB構築（自動実行）
 if os.getenv('ENABLE_VECTOR_DB', 'true').lower() == 'true' and enhanced_json_path:
     try:
-        from src.step5_vector_db.build_unified_vector_index import main as build_vector_db
+        from src.vector_db.build_unified_vector_index import main as build_vector_db
 
         print("\n" + "=" * 70)
         print("🔄 Phase 11-4: Vector DB構築自動実行")
@@ -426,7 +426,7 @@ export ENABLE_VECTOR_DB=false
 
 ### 変更ファイル
 
-1. **`src/step2_participants/integrated_pipeline.py`** (187行 → 324行)
+1. **[src/pipeline/integrated_pipeline.py](../src/pipeline/integrated_pipeline.py)** (187行 → 324行)
    - meeting_date取得修正（Line 70-80）
    - Steps 1-10フロー再構成（Line 148-270）
    - Step 5: トピック/エンティティ抽出追加（Line 148-163）
@@ -434,22 +434,22 @@ export ENABLE_VECTOR_DB=false
    - Step 7: 話者推論強化（Line 181-199）
    - ヘッダーコメント更新（Line 1-18）
 
-2. **`src/step2_participants/enhanced_speaker_inference.py`** (Line 39-95)
+2. **[src/participants/enhanced_speaker_inference.py](../src/participants/enhanced_speaker_inference.py)** (Line 39-95)
    - entitiesパラメータ追加（Line 42）
    - エンティティ情報整形ロジック追加（Line 91-95）
    - プロンプト拡張（Line 98-105）
    - Docstring更新（Line 45-60）
 
-3. **`src/step1_transcribe/structured_transcribe.py`** (Line 679-725)
+3. **[src/transcription/structured_transcribe.py](../src/transcription/structured_transcribe.py)** (Line 679-725)
    - Phase 11-4呼び出しロジック追加（Line 705-723）
    - enhanced_json_path変数追加（Line 680, 697）
    - 環境変数制御実装（Line 706）
 
 ### 活用する既存ファイル
 
-- `src/step3_topics/add_topics_entities.py` - Step 5で使用
-- `src/step4_entities/entity_resolution_llm.py` - Step 6（バッチ処理）で使用
-- `src/step5_vector_db/build_unified_vector_index.py` - Phase 11-4で使用
+- [src/topics/add_topics_entities.py](../src/topics/add_topics_entities.py) - Step 5で使用
+- [src/topics/entity_resolution_llm.py](../src/topics/entity_resolution_llm.py) - Step 6（バッチ処理）で使用
+- [src/vector_db/build_unified_vector_index.py](../src/vector_db/build_unified_vector_index.py) - Phase 11-4で使用
 
 ## 次のステップ
 

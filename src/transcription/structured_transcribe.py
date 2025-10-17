@@ -580,7 +580,7 @@ def main():
         # [Phase 10-1] 自動ファイル名変更（Phase 10-4の前に実行）
         if os.getenv('AUTO_RENAME_FILES', 'false').lower() == 'true':
             try:
-                from src.step7_file_management.generate_smart_filename import (
+                from src.file_management.generate_smart_filename import (
                     generate_filename_from_transcription,
                     rename_local_files
                 )
@@ -680,7 +680,7 @@ def main():
         enhanced_json_path = None
         if os.getenv('ENABLE_INTEGRATED_PIPELINE', 'true').lower() == 'true':
             try:
-                from src.step2_participants.integrated_pipeline import run_phase_11_3_pipeline
+                from src.pipeline.integrated_pipeline import run_phase_11_3_pipeline
 
                 print("\n" + "=" * 70)
                 print("🔄 Phase 11-3統合パイプライン自動実行")
@@ -705,7 +705,7 @@ def main():
         # [Phase 11-4] Vector DB構築（自動実行）
         if os.getenv('ENABLE_VECTOR_DB', 'true').lower() == 'true' and enhanced_json_path:
             try:
-                from src.step5_vector_db.build_unified_vector_index import main as build_vector_db
+                from src.vector_db.build_unified_vector_index import main as build_vector_db
 
                 print("\n" + "=" * 70)
                 print("🔄 Phase 11-4: Vector DB構築自動実行")

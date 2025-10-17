@@ -193,16 +193,23 @@ def upsert_participant(canonical_name, display_names, organization, role, email,
 
 ```
 realtime_transcriber_benchmark_research/
-├── participants_db.sql          # データベーススキーマ定義
-├── participants_db.py            # CRUD API（260行）
-├── extract_participants.py       # 参加者抽出（217行）
-├── enhanced_speaker_inference.py # 話者推論統合版（302行）
-├── integrated_pipeline.py        # Phase 11-3メインパイプライン（280行）
-├── summary_generator.py          # 要約生成（参加者DB統合対応）
-└── run_phase_2_6_batch.py        # バッチ処理スクリプト（204行）
+├── src/
+│   ├── participants/
+│   │   ├── participants_db.sql          # データベーススキーマ定義
+│   │   ├── participants_db.py            # CRUD API（260行）
+│   │   ├── extract_participants.py       # 参加者抽出（217行）
+│   │   └── enhanced_speaker_inference.py # 話者推論統合版（302行）
+│   ├── pipeline/
+│   │   └── integrated_pipeline.py        # Phase 11-3メインパイプライン（280行）
+│   ├── shared/
+│   │   └── summary_generator.py          # 要約生成（参加者DB統合対応）
+│   └── batch/
+│       └── run_phase_2_6_batch.py        # バッチ処理スクリプト（204行）
 ```
 
 ### 4.2 participants_db.py（CRUD API）
+
+**ファイルパス**: [src/participants/participants_db.py](../src/participants/participants_db.py)
 
 **主要クラス**: `ParticipantsDB`
 
@@ -226,6 +233,8 @@ class ParticipantsDB:
 - COALESCE関数による既存値保護
 
 ### 4.3 extract_participants.py（参加者抽出）
+
+**ファイルパス**: [src/participants/extract_participants.py](../src/participants/extract_participants.py)
 
 **主要関数**: `extract_participants_from_description(description: str) -> List[Dict]`
 
@@ -252,6 +261,8 @@ class ParticipantsDB:
 - JSON解析失敗時: 例外キャッチ + 空リスト返却
 
 ### 4.4 enhanced_speaker_inference.py（話者推論統合版）
+
+**ファイルパス**: [src/participants/enhanced_speaker_inference.py](../src/participants/enhanced_speaker_inference.py)
 
 **主要関数**: `infer_speakers_with_participants(segments, calendar_participants, file_context)`
 
@@ -286,9 +297,11 @@ if calendar_participants:
 
 ### 4.5 integrated_pipeline.py（メインパイプライン）
 
+**ファイルパス**: [src/pipeline/integrated_pipeline.py](../src/pipeline/integrated_pipeline.py)
+
 **主要関数**: `run_phase_11_3_pipeline(structured_file_path: str) -> Dict`
 
-**8ステップ処理**:
+**10ステップ処理**:
 
 ```python
 # Step 1: JSON読み込み
@@ -352,6 +365,8 @@ meeting_id = db.register_meeting(
 
 ### 4.6 run_phase_2_6_batch.py（バッチ処理）
 
+**ファイルパス**: [src/batch/run_phase_2_6_batch.py](../src/batch/run_phase_2_6_batch.py)
+
 **主要関数**: `run_phase_2_6_for_all_files(downloads_dir="downloads")`
 
 **処理フロー**:
@@ -364,7 +379,7 @@ print("⏭ スキップ（Phase 11-3 integrated_pipeline.py で既に実行済�
 for file_path in structured_files:
     subprocess.run([
         "venv/bin/python3",
-        "add_topics_entities.py",
+        "src/topics/add_topics_entities.py",
         file_path
     ])
 
@@ -372,13 +387,13 @@ for file_path in structured_files:
 enhanced_files = glob.glob("*_structured_enhanced.json")
 subprocess.run([
     "venv/bin/python3",
-    "entity_resolution_llm.py"
+    "src/topics/entity_resolution_llm.py"
 ] + enhanced_files)
 
 # Phase 5: Vector DB構築（全ファイル処理）
 subprocess.run([
     "venv/bin/python3",
-    "build_unified_vector_index.py"
+    "src/vector_db/build_unified_vector_index.py"
 ] + enhanced_files)
 
 # Phase 6: RAG検証（スキップ）
@@ -463,7 +478,7 @@ Phase 4処理後:
 
 ```bash
 # 単一ファイル処理
-python3 integrated_pipeline.py downloads/meeting_20251016_structured.json
+python3 src/pipeline/integrated_pipeline.py downloads/meeting_20251016_structured.json
 
 # 出力例:
 # ========================================
@@ -494,7 +509,7 @@ python3 integrated_pipeline.py downloads/meeting_20251016_structured.json
 
 ```bash
 # downloadsディレクトリ内全ファイル処理
-python3 run_phase_2_6_batch.py downloads
+python3 src/batch/run_phase_2_6_batch.py downloads
 
 # 出力例:
 # ======================================================================
@@ -701,10 +716,10 @@ def test_extract_participants():
 **integrated_pipeline.py**:
 ```bash
 # 実際のJSONファイルを使った統合テスト
-python3 integrated_pipeline.py downloads/test_meeting_structured.json
+python3 src/pipeline/integrated_pipeline.py downloads/test_meeting_structured.json
 
 # 検証項目:
-# - 8ステップ全て成功
+# - 10ステップ全て成功
 # - DB内に参加者・会議情報登録確認
 # - JSONファイル更新確認（speaker_name, summary）
 ```
@@ -713,7 +728,7 @@ python3 integrated_pipeline.py downloads/test_meeting_structured.json
 
 ```bash
 # 12ファイル一括処理テスト
-python3 run_phase_2_6_batch.py downloads
+python3 src/batch/run_phase_2_6_batch.py downloads
 
 # 検証項目:
 # - Phase 3: 12/12ファイル成功
@@ -746,7 +761,7 @@ python3 run_phase_2_6_batch.py downloads
 
 4. **Google Calendar認証**
    ```bash
-   python3 calendar_integration.py  # 初回のみ
+   python3 src/shared/calendar_integration.py  # 初回のみ
    ```
 
 ### 11.2 定期メンテナンス
@@ -756,7 +771,7 @@ python3 run_phase_2_6_batch.py downloads
 - display_names重複チェックと手動クリーニング
 
 **月次タスク**:
-- Vector DBの再構築（`build_unified_vector_index.py`）
+- Vector DBの再構築（`src/vector_db/build_unified_vector_index.py`）
 - エンティティ解決精度の手動レビュー
 
 ### 11.3 トラブルシューティング

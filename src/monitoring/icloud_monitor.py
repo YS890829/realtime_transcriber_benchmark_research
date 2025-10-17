@@ -23,7 +23,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
 # 自作モジュール
-from src.step7_file_management import unified_registry as registry
+from src.file_management import unified_registry as registry
 
 # 設定
 ICLOUD_PATH = Path(os.getenv('ICLOUD_DRIVE_PATH',
