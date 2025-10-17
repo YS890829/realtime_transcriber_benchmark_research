@@ -580,7 +580,7 @@ def main():
         # [Phase 10-1] 自動ファイル名変更（Phase 10-4の前に実行）
         if os.getenv('AUTO_RENAME_FILES', 'false').lower() == 'true':
             try:
-                from generate_smart_filename import (
+                from src.step7_file_management.generate_smart_filename import (
                     generate_filename_from_transcription,
                     rename_local_files
                 )
@@ -620,8 +620,8 @@ def main():
         # [Phase 11-1] Googleカレンダー連携（予定マッチング + 要約生成統合）
         if os.getenv('ENABLE_CALENDAR_INTEGRATION', 'false').lower() == 'true':
             try:
-                from calendar_integration import get_file_date, get_events_for_file_date, match_event_with_transcript
-                from summary_generator import generate_summary_with_calendar
+                from src.shared.calendar_integration import get_file_date, get_events_for_file_date, match_event_with_transcript
+                from src.shared.summary_generator import generate_summary_with_calendar
 
                 print("\n📅 Googleカレンダー連携開始...")
 
@@ -664,7 +664,7 @@ def main():
         # [Phase 10-4 拡張] Google Docs作成（モバイルフレンドリー、リネーム後のファイル名を使用）
         if os.getenv('ENABLE_DOCS_EXPORT', 'false').lower() == 'true':
             try:
-                from drive_docs_export import export_json_to_docs
+                from tools.drive_docs_export import export_json_to_docs
 
                 print("\n📄 Google Docs作成中（モバイル表示用）...")
                 docs_success = export_json_to_docs(json_path)
