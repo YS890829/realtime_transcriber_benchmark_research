@@ -39,7 +39,9 @@ class ParticipantsDB:
         conn = sqlite3.connect(self.db_path)
 
         # SQLファイルからスキーマを読み込んで実行
-        with open("participants_db.sql", "r", encoding="utf-8") as f:
+        import os
+        sql_path = os.path.join(os.path.dirname(__file__), "participants_db.sql")
+        with open(sql_path, "r", encoding="utf-8") as f:
             schema_sql = f.read()
             conn.executescript(schema_sql)
 
