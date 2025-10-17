@@ -512,7 +512,8 @@ async def setup_webhook_endpoint(webhook_url: str):
     try:
         service = get_drive_service()
         folder_id = get_root_folder_id()
-        response = setup_webhook(service, folder_id, f"{webhook_url}/webhook")
+        # webhook_url should already include the /webhook path
+        response = setup_webhook(service, folder_id, webhook_url)
         return {"status": "success", "channel": response}
     except Exception as e:
         return {"status": "error", "message": str(e)}
