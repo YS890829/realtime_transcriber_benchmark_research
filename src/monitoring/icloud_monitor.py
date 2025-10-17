@@ -23,7 +23,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
 # 自作モジュール
-import unified_registry as registry
+from src.step7_file_management import unified_registry as registry
 
 # 設定
 ICLOUD_PATH = Path(os.getenv('ICLOUD_DRIVE_PATH',
@@ -326,7 +326,8 @@ def transcribe_audio_file(file_path: Path, user_display_name: str) -> Optional[P
         # structured_transcribe.py実行
         cmd = [
             sys.executable,  # 現在のPythonインタプリタ
-            'structured_transcribe.py',
+            '-m',
+            'src.step1_transcribe.structured_transcribe',
             str(actual_file_path)
         ]
 

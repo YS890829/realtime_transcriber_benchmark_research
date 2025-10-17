@@ -20,11 +20,11 @@ import sys
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from participants_db import ParticipantsDB
-from extract_participants import extract_participants_from_description
-from enhanced_speaker_inference import infer_speakers_with_participants, apply_speaker_inference_to_structured_json
-from calendar_integration import get_events_for_file_date, match_event_with_transcript
-from summary_generator import generate_summary_with_calendar
+from src.step2_participants.participants_db import ParticipantsDB
+from src.step2_participants.extract_participants import extract_participants_from_description
+from src.step2_participants.enhanced_speaker_inference import infer_speakers_with_participants, apply_speaker_inference_to_structured_json
+from src.shared.calendar_integration import get_events_for_file_date, match_event_with_transcript
+from src.shared.summary_generator import generate_summary_with_calendar
 
 
 def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:

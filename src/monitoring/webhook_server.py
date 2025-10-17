@@ -21,7 +21,7 @@ from filelock import FileLock, Timeout
 import time
 
 # Phase 10-3: Unified registry for duplicate detection
-import unified_registry as registry
+from src.step7_file_management import unified_registry as registry
 
 # Load environment variables
 load_dotenv()
@@ -131,7 +131,8 @@ def transcribe_file(audio_path):
     """Call structured_transcribe.py to transcribe (Gemini Audio API)"""
     cmd = [
         'venv/bin/python',
-        'structured_transcribe.py',
+        '-m',
+        'src.step1_transcribe.structured_transcribe',
         str(audio_path)
     ]
 

@@ -65,7 +65,7 @@ def run_phase_2_6_for_all_files(downloads_dir: str = "downloads"):
 
         try:
             result = subprocess.run(
-                ["venv/bin/python3", "add_topics_entities.py", file_path],
+                ["venv/bin/python3", "-m", "src.step3_topics.add_topics_entities", file_path],
                 capture_output=True,
                 text=True,
                 timeout=300  # 5分タイムアウト
@@ -108,7 +108,7 @@ def run_phase_2_6_for_all_files(downloads_dir: str = "downloads"):
         try:
             # entity_resolution_llm.py は個別JSONファイルを引数として受け取る
             result = subprocess.run(
-                ["venv/bin/python3", "entity_resolution_llm.py"] + enhanced_files,
+                ["venv/bin/python3", "-m", "src.step4_entities.entity_resolution_llm"] + enhanced_files,
                 capture_output=True,
                 text=True,
                 timeout=600  # 10分タイムアウト
@@ -152,7 +152,7 @@ def run_phase_2_6_for_all_files(downloads_dir: str = "downloads"):
         try:
             # build_unified_vector_index.py は個別JSONファイルを引数として受け取る
             result = subprocess.run(
-                ["venv/bin/python3", "build_unified_vector_index.py"] + enhanced_files,
+                ["venv/bin/python3", "-m", "src.step5_vector_db.build_unified_vector_index"] + enhanced_files,
                 capture_output=True,
                 text=True,
                 timeout=900  # 15分タイムアウト
