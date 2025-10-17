@@ -225,7 +225,7 @@ def process_new_files(service, folder_id='root'):
 
                         # [Phase 10-3.1] Delete duplicate file from Google Drive
                         try:
-                            from cloud_file_manager import (
+                            from src.step7_file_management.cloud_file_manager import (
                                 delete_gdrive_file,
                                 log_deletion,
                                 get_file_size_mb
@@ -305,7 +305,7 @@ def process_new_files(service, folder_id='root'):
                     # [Phase 10-2] Auto-delete cloud files (after transcription completed)
                     # Always delete cloud files after successful transcription
                     try:
-                        from cloud_file_manager import (
+                        from src.step7_file_management.cloud_file_manager import (
                             SafeDeletionValidator,
                             delete_gdrive_file,
                             log_deletion,
