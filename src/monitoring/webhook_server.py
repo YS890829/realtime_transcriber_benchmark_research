@@ -132,11 +132,11 @@ def transcribe_file(audio_path):
     cmd = [
         'venv/bin/python',
         '-m',
-        'src.step1_transcribe.structured_transcribe',
+        'src.transcription.structured_transcribe',
         str(audio_path)
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, env=os.environ.copy())
 
     # Always log subprocess output for debugging (flush=True for thread safety)
     print(f"[Debug] Transcription subprocess completed", flush=True)

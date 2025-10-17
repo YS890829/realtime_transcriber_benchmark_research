@@ -21,6 +21,10 @@ from datetime import datetime, timezone
 from typing import Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
+from dotenv import load_dotenv
+
+# .envファイルを読み込み
+load_dotenv()
 
 # 自作モジュール
 from src.file_management import unified_registry as registry
@@ -327,7 +331,7 @@ def transcribe_audio_file(file_path: Path, user_display_name: str) -> Optional[P
         cmd = [
             sys.executable,  # 現在のPythonインタプリタ
             '-m',
-            'src.step1_transcribe.structured_transcribe',
+            'src.transcription.structured_transcribe',
             str(actual_file_path)
         ]
 
@@ -337,11 +341,23 @@ def transcribe_audio_file(file_path: Path, user_display_name: str) -> Optional[P
             cmd,
             capture_output=True,
             text=True,
+            env=os.environ.copy(),  # 環境変数を継承
             timeout=3600  # 1時間タイムアウト
         )
 
         if result.returncode == 0:
             print(f"  ✅ Transcription successful", flush=True)
+
+            # Phase 11-3のログ出力を表示
+            if "Phase 11-3" in result.stdout:
+                print("\n" + "=" * 70, flush=True)
+                print("📊 Phase 11-3 実行ログ:", flush=True)
+                print("=" * 70, flush=True)
+                # Phase 11-3セクションのみ抽出して表示
+                for line in result.stdout.split('\n'):
+                    if 'Phase 11-3' in line or 'Step' in line or 'Meeting ID' in line or '✓' in line or '⏭' in line:
+                        print(f"  {line}", flush=True)
+                print("=" * 70 + "\n", flush=True)
 
             # Phase 10-1でリネームされた可能性があるのでレジストリ更新
             # （structured_transcribe.py内でgenerate_smart_filenameが呼ばれる）
