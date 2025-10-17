@@ -1,0 +1,17 @@
+# Cline Memory Bank Rules
+
+## Auto-read on session start
+When a new session starts, automatically read:
+1. projectbrief.md - Understand project goals
+2. activeContext.md - Know current focus
+3. progress.md - Check completion status
+
+## Update triggers
+Update memory bank when:
+- Task completed → progress.md + activeContext.md
+- Architecture changed → systemPatterns.md
+- New feature added → productContext.md + progress.md
+- Blocker identified → activeContext.md
+
+## File hierarchy
+projectbrief.md → productContext.md, systemPatterns.md, techContext.md → activeContext.md → progress.md
