@@ -676,6 +676,28 @@ def main():
                 print(f"⚠️  Google Docs作成エラー: {e}")
                 print("  JSONファイルはアップロードされています")
 
+        # [Phase 11-3] 統合パイプライン自動実行（参加者DB統合・話者推論）
+        if os.getenv('ENABLE_INTEGRATED_PIPELINE', 'true').lower() == 'true':
+            try:
+                from src.step2_participants.integrated_pipeline import run_phase_11_3_pipeline
+
+                print("\n" + "=" * 70)
+                print("🔄 Phase 11-3統合パイプライン自動実行")
+                print("=" * 70)
+
+                pipeline_result = run_phase_11_3_pipeline(json_path)
+
+                if pipeline_result.get('success'):
+                    print(f"✅ 統合パイプライン完了")
+                    print(f"   Meeting ID: {pipeline_result.get('meeting_id')}")
+                    print(f"   参加者: {pipeline_result.get('participant_count', 0)}名")
+                else:
+                    print(f"⚠️  統合パイプライン実行中にエラーが発生しましたが、処理を続行します")
+
+            except Exception as e:
+                print(f"⚠️  統合パイプライン自動実行エラー: {e}")
+                print("  文字起こしは完了しています")
+
         print("\n🎉 完了!")
 
     except Exception as e:
