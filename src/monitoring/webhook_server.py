@@ -27,7 +27,7 @@ from src.step7_file_management import unified_registry as registry
 load_dotenv()
 
 # Constants from environment variables
-SCOPES = [os.getenv('GOOGLE_DRIVE_SCOPES', 'https://www.googleapis.com/auth/drive.readonly')]
+SCOPES = [os.getenv('GOOGLE_DRIVE_SCOPES', 'https://www.googleapis.com/auth/drive')]
 TOKEN_PATH = os.getenv('TOKEN_PATH', 'token.json')
 PROCESSED_FILE = os.getenv('PROCESSED_FILE', '.processed_drive_files.txt')
 DOWNLOAD_DIR = Path(os.getenv('DOWNLOAD_DIR', 'downloads'))
