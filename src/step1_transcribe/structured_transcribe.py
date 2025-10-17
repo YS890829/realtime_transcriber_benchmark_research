@@ -677,6 +677,7 @@ def main():
                 print("  JSONファイルはアップロードされています")
 
         # [Phase 11-3] 統合パイプライン自動実行（参加者DB統合・話者推論）
+        enhanced_json_path = None
         if os.getenv('ENABLE_INTEGRATED_PIPELINE', 'true').lower() == 'true':
             try:
                 from src.step2_participants.integrated_pipeline import run_phase_11_3_pipeline
@@ -691,12 +692,35 @@ def main():
                     print(f"✅ 統合パイプライン完了")
                     print(f"   Meeting ID: {pipeline_result.get('meeting_id')}")
                     print(f"   参加者: {pipeline_result.get('participant_count', 0)}名")
+
+                    # enhanced JSONパスを保存（Phase 11-4で使用）
+                    enhanced_json_path = json_path.replace('_structured.json', '_structured_enhanced.json')
                 else:
                     print(f"⚠️  統合パイプライン実行中にエラーが発生しましたが、処理を続行します")
 
             except Exception as e:
                 print(f"⚠️  統合パイプライン自動実行エラー: {e}")
                 print("  文字起こしは完了しています")
+
+        # [Phase 11-4] Vector DB構築（自動実行）
+        if os.getenv('ENABLE_VECTOR_DB', 'true').lower() == 'true' and enhanced_json_path:
+            try:
+                from src.step5_vector_db.build_unified_vector_index import main as build_vector_db
+
+                print("\n" + "=" * 70)
+                print("🔄 Phase 11-4: Vector DB構築自動実行")
+                print("=" * 70)
+
+                # enhanced JSONファイルが存在する場合のみ実行
+                if os.path.exists(enhanced_json_path):
+                    build_vector_db([enhanced_json_path])
+                    print(f"✅ Vector DB構築完了")
+                else:
+                    print(f"⚠️  Enhanced JSONファイルが見つかりません: {enhanced_json_path}")
+
+            except Exception as e:
+                print(f"⚠️  Vector DB構築エラー: {e}")
+                print("  Phase 11-3までの処理は完了しています")
 
         print("\n🎉 完了!")
 

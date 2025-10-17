@@ -39,14 +39,16 @@ genai.configure(api_key=GEMINI_API_KEY)
 def infer_speakers_with_participants(
     segments: List[Dict],
     calendar_participants: List[Dict] = None,
+    entities: Dict = None,
     file_context: str = ""
 ) -> Dict:
     """
-    カレンダー参加者情報を統合した話者推論
+    カレンダー参加者情報とエンティティ情報を統合した話者推論
 
     Args:
         segments: 文字起こしセグメント（speaker, text, start, endを含む）
         calendar_participants: extract_participants_from_description()の出力
+        entities: トピック/エンティティ抽出の結果（people, organizationsなど）
         file_context: ファイル名などの追加コンテキスト
 
     Returns:
@@ -86,11 +88,18 @@ def infer_speakers_with_participants(
                 participants_info += f"\n  呼称例: {', '.join(display_names)}"
             participants_info += "\n"
 
+    # エンティティ情報の整形（entities.people活用）
+    entities_info = ""
+    if entities and entities.get("people"):
+        entities_info = "\n【会話内で言及された人物】\n"
+        entities_info += f"- {', '.join(entities['people'])}\n"
+
     # プロンプト作成（既存のinfer_speakers.pyをベース）
     prompt = f"""以下は録音された会話の文字起こしです。
 
 ファイル情報: {file_context}
 {participants_info}
+{entities_info}
 
 会話内容:
 {conversation_text}

@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-Phase 11-3: 統合パイプライン
+Phase 11-3: 統合パイプライン（最適化版）
 作成日: 2025-10-16
+更新日: 2025-10-17
 
-Phase 11-3の8ステップを統合したメインパイプライン:
+Phase 11-3の10ステップを統合したメインパイプライン:
 Step 1: 構造化JSON読み込み
 Step 2: カレンダーイベントマッチング
 Step 3: 参加者抽出
 Step 4: 参加者DB検索
-Step 5: 話者推論
-Step 6: 要約生成
-Step 7: 参加者DB更新
-Step 8: 会議情報登録
+Step 5: トピック/エンティティ抽出 ★最適化
+Step 6: エンティティ解決 ★最適化
+Step 7: 話者推論（entities.people活用） ★強化
+Step 8: 要約生成
+Step 9: 参加者DB更新
+Step 10: 会議情報登録
 """
 
 import os
@@ -25,6 +28,7 @@ from src.step2_participants.extract_participants import extract_participants_fro
 from src.step2_participants.enhanced_speaker_inference import infer_speakers_with_participants, apply_speaker_inference_to_structured_json
 from src.shared.calendar_integration import get_events_for_file_date, match_event_with_transcript
 from src.shared.summary_generator import generate_summary_with_calendar
+from src.step3_topics.add_topics_entities import extract_topics_and_entities
 
 
 def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
@@ -66,10 +70,18 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
 
     segments = data.get("segments", [])
     metadata = data.get("metadata", {})
-    file_date = metadata.get("date", "")
 
-    print(f"  ✓ ファイル読み込み完了: {len(segments)} セグメント")
-    print(f"  ✓ 会議日: {file_date}")
+    # meeting_dateを音声ファイルの作成日時から取得（修正1）
+    audio_file_path = structured_file_path.replace('_structured.json', '.m4a')
+    if os.path.exists(audio_file_path):
+        file_mtime = os.path.getmtime(audio_file_path)
+        file_date = datetime.fromtimestamp(file_mtime).strftime('%Y%m%d')
+        print(f"  ✓ ファイル読み込み完了: {len(segments)} セグメント")
+        print(f"  ✓ 会議日: {file_date} (音声ファイル作成日時から取得)")
+    else:
+        file_date = datetime.now().strftime('%Y%m%d')  # Fallback
+        print(f"  ✓ ファイル読み込み完了: {len(segments)} セグメント")
+        print(f"  ⚠ 音声ファイル未発見、現在日時を使用: {file_date}")
 
     # ========================
     # Step 2: カレンダーイベントマッチング
@@ -134,12 +146,45 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
         print("  ⏭ スキップ（参加者情報なし）")
 
     # ========================
-    # Step 5: 話者推論（参加者情報統合版）
+    # Step 5: トピック/エンティティ抽出 ★新規追加
     # ========================
-    print("\n[Step 5] 話者推論実行中...")
+    print("\n[Step 5] トピック/エンティティ抽出中...")
+    full_text = "\n".join([seg["text"] for seg in segments])
+    topics_entities_result = extract_topics_and_entities(full_text)
+
+    topics = topics_entities_result.get("topics", [])
+    entities = topics_entities_result.get("entities", {})
+    entities_people = entities.get("people", [])
+
+    print(f"  ✓ トピック抽出完了: {len(topics)} トピック")
+    print(f"  ✓ エンティティ抽出完了: {len(entities_people)} 人物")
+    if entities_people:
+        print(f"    人物: {', '.join(entities_people[:5])}" + ("..." if len(entities_people) > 5 else ""))
+
+    # ========================
+    # Step 6: エンティティ解決 ★新規追加
+    # ========================
+    print("\n[Step 6] エンティティ解決中...")
+    # 単一ファイルのエンティティ解決は簡略化（正規化のみ）
+    resolved_people = []
+    for person in entities_people:
+        # 敬称除去などの簡単な正規化
+        normalized = person.replace('さん', '').replace('様', '').replace('氏', '').strip()
+        if normalized and normalized not in resolved_people:
+            resolved_people.append(normalized)
+
+    print(f"  ✓ エンティティ解決完了: {len(resolved_people)} 人物（重複除去後）")
+    if resolved_people:
+        print(f"    正規化後: {', '.join(resolved_people[:5])}" + ("..." if len(resolved_people) > 5 else ""))
+
+    # ========================
+    # Step 7: 話者推論（entities.people活用） ★強化
+    # ========================
+    print("\n[Step 7] 話者推論実行中（エンティティ情報統合）...")
     inference_result = infer_speakers_with_participants(
         segments=segments,
         calendar_participants=calendar_participants,
+        entities={"people": resolved_people},  # エンティティ情報を追加
         file_context=os.path.basename(structured_file_path)
     )
 
@@ -154,9 +199,9 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
     print(f"  ✓ 構造化JSONに speaker_name 追加完了")
 
     # ========================
-    # Step 6: 要約生成（参加者DB情報統合）
+    # Step 8: 要約生成（参加者DB情報統合）
     # ========================
-    print("\n[Step 6] 要約生成中...")
+    print("\n[Step 8] 要約生成中...")
 
     # 参加者情報をコンテキストに追加
     participants_context = ""
@@ -189,9 +234,9 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
         summary_data = None
 
     # ========================
-    # Step 7: 参加者DB更新（UPSERT）
+    # Step 9: 参加者DB更新（UPSERT）
     # ========================
-    print("\n[Step 7] 参加者DB更新中...")
+    print("\n[Step 9] 参加者DB更新中...")
 
     participant_canonical_names = []
     if calendar_participants:
@@ -220,9 +265,9 @@ def run_phase_11_3_pipeline(structured_file_path: str) -> Dict:
         print("  ⏭ スキップ（参加者情報なし）")
 
     # ========================
-    # Step 8: 会議情報登録
+    # Step 10: 会議情報登録
     # ========================
-    print("\n[Step 8] 会議情報登録中...")
+    print("\n[Step 10] 会議情報登録中...")
 
     meeting_id = db.register_meeting(
         structured_file_path=structured_file_path,
@@ -267,9 +312,10 @@ if __name__ == "__main__":
         result = run_phase_11_3_pipeline(structured_file_path)
         print("\n✅ パイプライン実行成功")
         print(f"Meeting ID: {result['meeting_id']}")
-        if result['matched_event']:
-            print(f"イベント: {result['matched_event']['summary']}")
-        print(f"参加者: {len(result['calendar_participants'])}名")
+        if result.get('matched_event'):
+            event_summary = result['matched_event'].get('summary', '無題')
+            print(f"イベント: {event_summary}")
+        print(f"参加者: {len(result.get('calendar_participants', []))}名")
     except Exception as e:
         print(f"\n❌ パイプライン実行エラー: {e}")
         import traceback
